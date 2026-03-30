@@ -1,51 +1,65 @@
 package com.rv.ecommerce.services;
 
 import com.rv.ecommerce.entities.AccountEntity;
+import com.rv.ecommerce.exceptions.AccountCreationException;
+import com.rv.ecommerce.exceptions.AccountNotFoundException;
 import com.rv.ecommerce.repositories.AccountRepository;
 import com.rv.ecommerce.requests.AccountRequest;
 import com.rv.ecommerce.responses.AccountResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AccountService {
 
     private final AccountRepository accountRepository;
 
-    public AccountResponse create(AccountRequest request) {
-        AccountEntity entity = new AccountEntity();
-        entity.setAccountNumber(generateAccountNumber());
-        entity.setOwnerId(request.ownerId());
-        entity.setCurrency(request.currency());
-
-        AccountEntity saved = accountRepository.save(entity);
-        return toResponse(saved);
+    public AccountResponse createAccount(AccountRequest request) {
+        log.info("Creating account for ownerId={}", request.ownerId());
+        try {
+            AccountResponse response = toResponse(accountRepository.save(toEntity(request)));
+            log.info("Account created successfully: accountNumber={}, ownerId={}", response.accountNumber(), response.ownerId());
+            return response;
+        } catch (Exception exception) {
+            log.error("Failed to create account for ownerId={}", request.ownerId(), exception);
+            throw new AccountCreationException("Failed to create account", exception);
+        }
     }
 
     public AccountResponse getByAccountNumber(String accountNumber) {
+        log.info("Fetching account by accountNumber={}", accountNumber);
         AccountEntity entity = accountRepository.findById(accountNumber)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Account not found: " + accountNumber
-                ));
-        return toResponse(entity);
+                .orElseThrow(() -> new AccountNotFoundException(accountNumber));
+        AccountResponse response = toResponse(entity);
+        log.info("Account fetched successfully: accountNumber={}, status={}", response.accountNumber(), response.status());
+        return response;
     }
 
     private AccountResponse toResponse(AccountEntity entity) {
-        return new AccountResponse(
-                entity.getAccountNumber(),
-                entity.getCurrency(),
-                entity.getStatus(),
-                entity.getOwnerId(),
-                entity.getBalance(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
-        );
+        return AccountResponse.builder()
+                .accountNumber(entity.getAccountNumber())
+                .currency(entity.getCurrency())
+                .status(entity.getStatus())
+                .ownerId(entity.getOwnerId())
+                .balance(entity.getBalance())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .build();
+    }
+
+    private AccountEntity toEntity(AccountRequest request) {
+        String generatedAccountNumber = generateAccountNumber();
+        log.debug("Generated accountNumber={}", generatedAccountNumber);
+        return AccountEntity.builder()
+                .accountNumber(generatedAccountNumber)
+                .ownerId(request.ownerId())
+                .currency(request.currency())
+                .build();
     }
 
     private String generateAccountNumber() {
