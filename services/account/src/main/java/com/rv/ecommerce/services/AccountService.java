@@ -3,6 +3,7 @@ package com.rv.ecommerce.services;
 import com.rv.ecommerce.entities.AccountEntity;
 import com.rv.ecommerce.exceptions.AccountCreationException;
 import com.rv.ecommerce.exceptions.AccountNotFoundException;
+import com.rv.ecommerce.mappers.AccountMapper;
 import com.rv.ecommerce.repositories.AccountRepository;
 import com.rv.ecommerce.requests.AccountRequest;
 import com.rv.ecommerce.responses.AccountResponse;
@@ -18,11 +19,16 @@ import java.util.UUID;
 public class AccountService {
 
     private final AccountRepository accountRepository;
+    private final AccountMapper accountMapper;
 
     public AccountResponse createAccount(AccountRequest request) {
         log.info("Creating account for ownerId={}", request.ownerId());
         try {
-            AccountResponse response = toResponse(accountRepository.save(toEntity(request)));
+            String generatedAccountNumber = generateAccountNumber();
+            log.debug("Generated accountNumber={}", generatedAccountNumber);
+            AccountResponse response = accountMapper.toResponse(accountRepository.save(
+                    accountMapper.toEntity(request, generatedAccountNumber)
+            ));
             log.info("Account created successfully: accountNumber={}, ownerId={}", response.accountNumber(), response.ownerId());
             return response;
         } catch (Exception exception) {
@@ -35,31 +41,9 @@ public class AccountService {
         log.info("Fetching account by accountNumber={}", accountNumber);
         AccountEntity entity = accountRepository.findById(accountNumber)
                 .orElseThrow(() -> new AccountNotFoundException(accountNumber));
-        AccountResponse response = toResponse(entity);
+        AccountResponse response = accountMapper.toResponse(entity);
         log.info("Account fetched successfully: accountNumber={}, status={}", response.accountNumber(), response.status());
         return response;
-    }
-
-    private AccountResponse toResponse(AccountEntity entity) {
-        return AccountResponse.builder()
-                .accountNumber(entity.getAccountNumber())
-                .currency(entity.getCurrency())
-                .status(entity.getStatus())
-                .ownerId(entity.getOwnerId())
-                .balance(entity.getBalance())
-                .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
-                .build();
-    }
-
-    private AccountEntity toEntity(AccountRequest request) {
-        String generatedAccountNumber = generateAccountNumber();
-        log.debug("Generated accountNumber={}", generatedAccountNumber);
-        return AccountEntity.builder()
-                .accountNumber(generatedAccountNumber)
-                .ownerId(request.ownerId())
-                .currency(request.currency())
-                .build();
     }
 
     private String generateAccountNumber() {
