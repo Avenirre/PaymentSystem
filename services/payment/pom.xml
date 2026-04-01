@@ -9,9 +9,9 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>account</artifactId>
-    <name>account</name>
-    <description>account</description>
+    <artifactId>payment</artifactId>
+    <name>payment</name>
+    <description>payment</description>
     <url/>
     <licenses>
         <license/>
