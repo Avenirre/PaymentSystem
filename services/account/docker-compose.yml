@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: account-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-account}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - account-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  account:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: account-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-account}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      SPRING_DEVTOOLS_RESTART_ENABLED: "false"
+      SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
+    ports:
+      - "${APP_PORT:-8090}:8090"
+
+volumes:
+  account-postgres-data:
