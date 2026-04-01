@@ -1,0 +1,30 @@
+### Maven / Java ###
+/target/
+*.class
+
+### IDE ###
+/.idea/
+*.iml
+*.iws
+*.ipr
+/.vscode/
+
+### Build tools / other IDEs ###
+/.settings/
+.classpath
+.project
+/.factorypath
+/.apt_generated/
+
+### Logs ###
+*.log
+/logs/
+
+### Environment ###
+.env
+.env.*
+!.env.example
+
+### OS ###
+.DS_Store
+Thumbs.db
