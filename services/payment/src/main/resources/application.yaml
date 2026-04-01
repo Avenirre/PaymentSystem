@@ -22,3 +22,8 @@ spring:
 
 server:
   port: 8091
+
+cashback:
+  enabled: ${CASHBACK_ENABLED:true}
+  base-url: ${CASHBACK_SERVICE_URL:http://localhost:8092}
+  notify-path: ${CASHBACK_NOTIFY_PATH:/api/v1/cashback/transfers}
