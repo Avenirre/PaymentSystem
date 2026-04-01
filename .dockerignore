@@ -1,0 +1,8 @@
+.git
+.idea
+**/*.iml
+**/.DS_Store
+Thumbs.db
+**/target
+**/*.log
+**/logs

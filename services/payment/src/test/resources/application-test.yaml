@@ -13,3 +13,6 @@ spring:
   devtools:
     restart:
       enabled: false
+
+cashback:
+  enabled: false

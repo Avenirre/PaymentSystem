@@ -1,39 +1,39 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: account-postgres
+    container_name: payment-postgres
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-account}
+      POSTGRES_DB: ${DB_NAME:-payment}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
-      - account-postgres-data:/var/lib/postgresql/data
-      - ./docker/init-create-payment-db.sql:/docker-entrypoint-initdb.d/02-create-payment.sql
+      - payment-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  account:
+  payment:
     build:
       context: ../..
-      dockerfile: services/account/Dockerfile
-    container_name: account-service
+      dockerfile: services/payment/Dockerfile
+    container_name: payment-service
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      # Явный URL — Spring Boot надёжно подхватывает; хост postgres = имя сервиса в сети compose (не localhost)
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-account}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-payment}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-postgres}
       SPRING_DEVTOOLS_RESTART_ENABLED: "false"
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
+      CASHBACK_SERVICE_URL: ${CASHBACK_SERVICE_URL:-http://host.docker.internal:8092}
+      CASHBACK_ENABLED: ${CASHBACK_ENABLED:-true}
     ports:
-      - "${APP_PORT:-8090}:8090"
+      - "${APP_PORT:-8091}:8091"
 
 volumes:
-  account-postgres-data:
+  payment-postgres-data:
