@@ -7,7 +7,6 @@ import com.rv.ecommerce.exceptions.GlobalExceptionHandler;
 import com.rv.ecommerce.requests.AccountRequest;
 import com.rv.ecommerce.responses.AccountResponse;
 import com.rv.ecommerce.services.AccountService;
-import com.rv.ecommerce.test.JacksonTestConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -32,14 +31,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = AccountController.class)
-@Import({GlobalExceptionHandler.class, JacksonTestConfiguration.class})
+@Import(GlobalExceptionHandler.class)
 class AccountControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @MockitoBean
     private AccountService accountService;
