@@ -1,6 +1,8 @@
 package com.rv.ecommerce.controllers;
 
 import com.rv.ecommerce.requests.AccountRequest;
+import com.rv.ecommerce.requests.ApplyTransferRequest;
+import com.rv.ecommerce.requests.CompensateTransferRequest;
 import com.rv.ecommerce.responses.AccountResponse;
 import com.rv.ecommerce.services.AccountService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,7 +13,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,7 +25,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/account")
 @Tag(name = "Accounts", description = "Operations for bank accounts")
-@Slf4j
 @RequiredArgsConstructor
 public class AccountController {
 
@@ -40,10 +40,7 @@ public class AccountController {
             @ApiResponse(responseCode = "500", description = "Account creation failed")
     })
     public AccountResponse createAccount(@Valid @RequestBody AccountRequest request) {
-        log.info("POST /account called");
-        AccountResponse response = accountService.createAccount(request);
-        log.info("POST /account completed accountNumber={}", response.accountNumber());
-        return response;
+        return accountService.createAccount(request);
     }
 
     @GetMapping("/{accountNumber}")
@@ -55,9 +52,20 @@ public class AccountController {
             @ApiResponse(responseCode = "500", description = "Unexpected server error")
     })
     public AccountResponse getAccountByAccountNumber(@PathVariable String accountNumber) {
-        log.info("GET /account/{} called", accountNumber);
-        AccountResponse response = accountService.getByAccountNumber(accountNumber);
-        log.info("GET /account/{} completed status={}", accountNumber, response.status());
-        return response;
+        return accountService.getByAccountNumber(accountNumber);
+    }
+
+    @PostMapping("/transfers/apply")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Apply transfer", description = "Moves funds between accounts (idempotent by transferId)")
+    public void applyTransfer(@Valid @RequestBody ApplyTransferRequest request) {
+        accountService.applyTransfer(request);
+    }
+
+    @PostMapping("/transfers/compensate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Compensate transfer", description = "Reverses a previously applied transfer (idempotent)")
+    public void compensateTransfer(@Valid @RequestBody CompensateTransferRequest request) {
+        accountService.compensateTransfer(request.transferId());
     }
 }
