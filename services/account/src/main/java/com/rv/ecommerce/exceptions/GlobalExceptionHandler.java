@@ -41,6 +41,48 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(InsufficientFundsException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientFunds(
+            InsufficientFundsException exception,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse(
+                        "INSUFFICIENT_FUNDS",
+                        exception.getMessage(),
+                        Instant.now(),
+                        request.getRequestURI()
+                ));
+    }
+
+    @ExceptionHandler(AccountTransferConflictException.class)
+    public ResponseEntity<ErrorResponse> handleTransferConflict(
+            AccountTransferConflictException exception,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse(
+                        "TRANSFER_CONFLICT",
+                        exception.getMessage(),
+                        Instant.now(),
+                        request.getRequestURI()
+                ));
+    }
+
+    @ExceptionHandler(InvalidTransferException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidTransfer(
+            InvalidTransferException exception,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(
+                        "INVALID_TRANSFER",
+                        exception.getMessage(),
+                        Instant.now(),
+                        request.getRequestURI()
+                ));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(
             MethodArgumentNotValidException exception,

@@ -1,10 +1,12 @@
 FROM eclipse-temurin:21-jdk-alpine AS builder
+RUN apk add --no-cache unzip
 WORKDIR /app
 
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
-RUN chmod +x mvnw
+# Windows CRLF in mvnw breaks shebang on Linux (./mvnw: not found)
+RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
 
 COPY services/payment/pom.xml services/payment/
 RUN mkdir -p services/payment/src/main/java
