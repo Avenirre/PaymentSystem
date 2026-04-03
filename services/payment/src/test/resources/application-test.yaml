@@ -16,3 +16,6 @@ spring:
 
 cashback:
   enabled: false
+
+account:
+  base-url: http://localhost:8090

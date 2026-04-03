@@ -2,8 +2,8 @@ package com.rv.ecommerce.cashback;
 
 import com.rv.ecommerce.exceptions.CashbackServiceException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -12,6 +12,7 @@ import org.springframework.web.client.RestClientException;
 @RequiredArgsConstructor
 public class CashbackClient {
 
+    @Qualifier("cashbackRestClient")
     private final RestClient cashbackRestClient;
 
     @Value("${cashback.notify-path}")

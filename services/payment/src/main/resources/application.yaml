@@ -23,6 +23,9 @@ spring:
 server:
   port: 8091
 
+account:
+  base-url: ${ACCOUNT_SERVICE_URL:http://localhost:8090}
+
 cashback:
   enabled: ${CASHBACK_ENABLED:true}
   base-url: ${CASHBACK_SERVICE_URL:http://localhost:8092}
