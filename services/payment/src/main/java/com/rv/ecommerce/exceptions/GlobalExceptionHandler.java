@@ -27,6 +27,25 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(AccountOperationException.class)
+    public ResponseEntity<ErrorResponse> handleAccountOperation(
+            AccountOperationException exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus httpStatus = switch (exception.getStatus()) {
+            case 404 -> HttpStatus.BAD_REQUEST;
+            case 409 -> HttpStatus.CONFLICT;
+            default -> exception.getStatus() >= 500 ? HttpStatus.BAD_GATEWAY : HttpStatus.BAD_REQUEST;
+        };
+        return ResponseEntity.status(httpStatus)
+                .body(new ErrorResponse(
+                        "ACCOUNT_SERVICE_ERROR",
+                        exception.getMessage(),
+                        Instant.now(),
+                        request.getRequestURI()
+                ));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(
             MethodArgumentNotValidException exception,

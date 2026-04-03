@@ -45,12 +45,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      account:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME_PAYMENT:-payment}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-postgres}
       SPRING_DEVTOOLS_RESTART_ENABLED: "false"
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
+      ACCOUNT_SERVICE_URL: ${ACCOUNT_SERVICE_URL:-http://account:8090}
       CASHBACK_SERVICE_URL: ${CASHBACK_SERVICE_URL:-http://host.docker.internal:8092}
       CASHBACK_ENABLED: ${CASHBACK_ENABLED:-true}
     ports:
