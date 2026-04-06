@@ -1,0 +1,8 @@
+spring:
+  mongodb:
+    uri: mongodb://localhost:27017/cashback-test
+
+cashback:
+  rates:
+    individual-default-percent: 1.0
+    legal-entity-default-percent: 0.5

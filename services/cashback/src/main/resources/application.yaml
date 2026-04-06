@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: cashback-service
+  # Spring Boot 4: use spring.mongodb.uri (spring.data.mongodb.* is ignored by auto-config)
+  mongodb:
+    uri: ${SPRING_MONGODB_URI:${SPRING_DATA_MONGODB_URI:mongodb://${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DATABASE:cashback}}}
+
+server:
+  port: 8092
+
+cashback:
+  rates:
+    individual-default-percent: ${CASHBACK_RATES_INDIVIDUAL_DEFAULT_PERCENT:1.0}
+    legal-entity-default-percent: ${CASHBACK_RATES_LEGAL_ENTITY_DEFAULT_PERCENT:0.5}

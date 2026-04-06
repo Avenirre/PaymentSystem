@@ -20,5 +20,6 @@
     <modules>
         <module>services/account</module>
         <module>services/payment</module>
+        <module>services/cashback</module>
     </modules>
 </project>
