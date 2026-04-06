@@ -1,7 +1,35 @@
-# Запуск Postgres + Mongo + account + payment + cashback из корня репозитория:
+# Запуск Postgres + Mongo + Kafka + account + payment + cashback из корня репозитория:
 #   docker compose up --build -d
 
 services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: paymentsystem-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "${ZOOKEEPER_PORT:-2181}:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: paymentsystem-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
   mongo:
     image: mongo:7
     container_name: paymentsystem-mongo
@@ -60,6 +88,8 @@ services:
         condition: service_healthy
       account:
         condition: service_started
+      kafka:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME_PAYMENT:-payment}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
@@ -67,8 +97,9 @@ services:
       SPRING_DEVTOOLS_RESTART_ENABLED: "false"
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
       ACCOUNT_SERVICE_URL: ${ACCOUNT_SERVICE_URL:-http://account:8090}
-      CASHBACK_SERVICE_URL: ${CASHBACK_SERVICE_URL:-http://cashback:8092}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       CASHBACK_ENABLED: ${CASHBACK_ENABLED:-true}
+      CASHBACK_KAFKA_TOPIC: ${CASHBACK_KAFKA_TOPIC:-cashback.transfer.events}
     ports:
       - "${PAYMENT_PORT:-8091}:8091"
 
@@ -80,9 +111,13 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+      kafka:
+        condition: service_started
     environment:
       # Spring Boot 4 binds SPRING_MONGODB_URI → spring.mongodb.uri (not spring.data.mongodb.*)
       SPRING_MONGODB_URI: ${SPRING_MONGODB_URI:-mongodb://mongo:27017/cashback}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      CASHBACK_KAFKA_TOPIC: ${CASHBACK_KAFKA_TOPIC:-cashback.transfer.events}
       SPRING_DEVTOOLS_RESTART_ENABLED: "false"
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
       CASHBACK_RATES_INDIVIDUAL_DEFAULT_PERCENT: ${CASHBACK_RATES_INDIVIDUAL_DEFAULT_PERCENT:-1.0}

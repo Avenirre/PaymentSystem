@@ -13,9 +13,13 @@ spring:
   devtools:
     restart:
       enabled: false
+  kafka:
+    bootstrap-servers: localhost:9092
 
 cashback:
   enabled: false
+  kafka:
+    topic: cashback.transfer.events.test
 
 account:
   base-url: http://localhost:8090

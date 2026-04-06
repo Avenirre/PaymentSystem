@@ -1,13 +1,13 @@
 package com.rv.ecommerce.services;
 
 import com.rv.ecommerce.account.AccountClient;
-import com.rv.ecommerce.cashback.CashbackClient;
 import com.rv.ecommerce.entities.PaymentTransfer;
 import com.rv.ecommerce.entities.PaymentTransfer.CurrencyCode;
 import com.rv.ecommerce.entities.PaymentTransfer.PaymentStatus;
 import com.rv.ecommerce.entities.PaymentTransfer.TransferType;
 import com.rv.ecommerce.exceptions.AccountOperationException;
 import com.rv.ecommerce.exceptions.CashbackServiceException;
+import com.rv.ecommerce.kafka.CashbackKafkaProducer;
 import com.rv.ecommerce.mappers.PaymentMapper;
 import com.rv.ecommerce.repositories.PaymentTransferRepository;
 import com.rv.ecommerce.requests.IndividualTransferRequest;
@@ -46,7 +46,7 @@ class PaymentServiceTest {
     private PaymentMapper paymentMapper;
 
     @Mock
-    private CashbackClient cashbackClient;
+    private CashbackKafkaProducer cashbackKafkaProducer;
 
     @Mock
     private AccountClient accountClient;
@@ -68,20 +68,6 @@ class PaymentServiceTest {
                 .toAccountNumber("to1")
                 .amount(new BigDecimal("100.50"))
                 .currency(CurrencyCode.RUB)
-                .build();
-
-        PaymentTransfer saved = PaymentTransfer.builder()
-                .id(id)
-                .transferType(TransferType.INDIVIDUAL)
-                .fromAccountNumber("from1")
-                .toAccountNumber("to1")
-                .amount(new BigDecimal("100.50"))
-                .currency(CurrencyCode.RUB)
-                .status(PaymentStatus.COMPLETED)
-                .cashbackNotified(false)
-                .createdAt(now)
-                .updatedAt(now)
-                .version(0L)
                 .build();
 
         PaymentTransferResponse response = PaymentTransferResponse.builder()
@@ -110,7 +96,7 @@ class PaymentServiceTest {
                 eq(CurrencyCode.RUB)
         );
         assertThat(transferIdCaptor.getValue()).isNotNull();
-        verify(cashbackClient, never()).notifyLegalEntityTransfer(any());
+        verify(cashbackKafkaProducer, never()).publishLegalEntityTransfer(any());
         verify(accountClient, never()).compensateTransfer(any());
     }
 
@@ -164,22 +150,6 @@ class PaymentServiceTest {
                 .legalEntityName("OOO Test")
                 .build();
 
-        PaymentTransfer saved = PaymentTransfer.builder()
-                .id(id)
-                .transferType(TransferType.LEGAL_ENTITY)
-                .fromAccountNumber("from1")
-                .toAccountNumber("to1")
-                .amount(new BigDecimal("200.00"))
-                .currency(CurrencyCode.RUB)
-                .status(PaymentStatus.COMPLETED)
-                .legalEntityInn("1234567890")
-                .legalEntityName("OOO Test")
-                .cashbackNotified(true)
-                .createdAt(now)
-                .updatedAt(now)
-                .version(0L)
-                .build();
-
         PaymentTransferResponse response = PaymentTransferResponse.builder()
                 .transferId(id)
                 .transferType(TransferType.LEGAL_ENTITY)
@@ -196,7 +166,7 @@ class PaymentServiceTest {
         when(paymentMapper.toResponse(any(PaymentTransfer.class))).thenReturn(response);
 
         assertThat(paymentService.transferToLegalEntity(request)).isEqualTo(response);
-        verify(cashbackClient).notifyLegalEntityTransfer(any());
+        verify(cashbackKafkaProducer).publishLegalEntityTransfer(any());
         verify(paymentTransferRepository, times(2)).save(any(PaymentTransfer.class));
         verify(accountClient, never()).compensateTransfer(any());
     }
@@ -215,25 +185,9 @@ class PaymentServiceTest {
                 .legalEntityName("OOO Fail")
                 .build();
 
-        PaymentTransfer saved = PaymentTransfer.builder()
-                .id(id)
-                .transferType(TransferType.LEGAL_ENTITY)
-                .fromAccountNumber("from1")
-                .toAccountNumber("to1")
-                .amount(new BigDecimal("50.00"))
-                .currency(CurrencyCode.EUR)
-                .status(PaymentStatus.PENDING)
-                .legalEntityInn("0987654321")
-                .legalEntityName("OOO Fail")
-                .cashbackNotified(false)
-                .createdAt(now)
-                .updatedAt(now)
-                .version(0L)
-                .build();
-
         when(paymentTransferRepository.save(any(PaymentTransfer.class))).thenAnswer(inv -> inv.getArgument(0));
-        doThrow(new CashbackServiceException("down", new RuntimeException("http")))
-                .when(cashbackClient).notifyLegalEntityTransfer(any());
+        doThrow(new CashbackServiceException("down", new RuntimeException("kafka")))
+                .when(cashbackKafkaProducer).publishLegalEntityTransfer(any());
 
         assertThatThrownBy(() -> paymentService.transferToLegalEntity(request))
                 .isInstanceOf(CashbackServiceException.class);
@@ -264,22 +218,6 @@ class PaymentServiceTest {
                 .legalEntityName("OOO X")
                 .build();
 
-        PaymentTransfer saved = PaymentTransfer.builder()
-                .id(id)
-                .transferType(TransferType.LEGAL_ENTITY)
-                .fromAccountNumber("a")
-                .toAccountNumber("b")
-                .amount(BigDecimal.TEN)
-                .currency(CurrencyCode.RUB)
-                .status(PaymentStatus.COMPLETED)
-                .legalEntityInn("1111111111")
-                .legalEntityName("OOO X")
-                .cashbackNotified(false)
-                .createdAt(now)
-                .updatedAt(now)
-                .version(0L)
-                .build();
-
         PaymentTransferResponse response = PaymentTransferResponse.builder()
                 .transferId(id)
                 .transferType(TransferType.LEGAL_ENTITY)
@@ -296,7 +234,7 @@ class PaymentServiceTest {
         when(paymentMapper.toResponse(any(PaymentTransfer.class))).thenReturn(response);
 
         assertThat(paymentService.transferToLegalEntity(request)).isEqualTo(response);
-        verify(cashbackClient, never()).notifyLegalEntityTransfer(any());
+        verify(cashbackKafkaProducer, never()).publishLegalEntityTransfer(any());
         verify(accountClient, never()).compensateTransfer(any());
     }
 
