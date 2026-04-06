@@ -7,6 +7,7 @@ import com.rv.ecommerce.entities.PaymentTransfer.TransferType;
 import com.rv.ecommerce.exceptions.CashbackServiceException;
 import com.rv.ecommerce.kafka.CashbackKafkaProducer;
 import com.rv.ecommerce.kafka.CashbackTransferPayload;
+import com.rv.ecommerce.kafka.IndividualCashbackPayload;
 import com.rv.ecommerce.mappers.PaymentMapper;
 import com.rv.ecommerce.repositories.PaymentTransferRepository;
 import com.rv.ecommerce.requests.IndividualTransferRequest;
@@ -34,7 +35,7 @@ public class PaymentService {
     @Value("${cashback.enabled:true}")
     private boolean cashbackEnabled;
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.SERIALIZABLE, noRollbackFor = CashbackServiceException.class)
     public PaymentTransferResponse transferToIndividual(IndividualTransferRequest request) {
         UUID transferId = UUID.randomUUID();
         boolean accountApplied = false;
@@ -55,12 +56,40 @@ public class PaymentService {
                     .toAccountNumber(request.toAccountNumber())
                     .amount(request.amount())
                     .currency(request.currency())
-                    .status(PaymentStatus.COMPLETED)
+                    .status(PaymentStatus.PENDING)
                     .cashbackNotified(false)
                     .build();
             PaymentTransfer saved = paymentTransferRepository.save(entity);
-            log.info("Individual transfer completed transferId={}", saved.getId());
+
+            if (cashbackEnabled) {
+                try {
+                    cashbackKafkaProducer.publishIndividualTransfer(new IndividualCashbackPayload(
+                            saved.getId(),
+                            saved.getFromAccountNumber(),
+                            saved.getToAccountNumber(),
+                            saved.getAmount(),
+                            saved.getCurrency().name()
+                    ));
+                    saved.setStatus(PaymentStatus.COMPLETED);
+                    saved.setCashbackNotified(true);
+                    paymentTransferRepository.save(saved);
+                    log.info("Individual transfer completed with cashback Kafka event transferId={}", saved.getId());
+                } catch (CashbackServiceException exception) {
+                    accountClient.compensateTransfer(transferId);
+                    saved.setStatus(PaymentStatus.FAILED);
+                    paymentTransferRepository.save(saved);
+                    log.warn("Individual transfer failed cashback Kafka, account compensated transferId={}", saved.getId());
+                    throw exception;
+                }
+            } else {
+                saved.setStatus(PaymentStatus.COMPLETED);
+                paymentTransferRepository.save(saved);
+                log.info("Individual transfer completed without cashback (disabled) transferId={}", saved.getId());
+            }
+
             return paymentMapper.toResponse(saved);
+        } catch (CashbackServiceException e) {
+            throw e;
         } catch (RuntimeException e) {
             if (accountApplied) {
                 compensateSafely(transferId);

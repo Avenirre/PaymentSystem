@@ -19,7 +19,8 @@ spring:
 cashback:
   enabled: false
   kafka:
-    topic: cashback.transfer.events.test
+    legal-entity-topic: cashback.transfer.events.test
+    individual-topic: cashback.individual.transfer.events.test
 
 account:
   base-url: http://localhost:8090

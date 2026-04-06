@@ -60,7 +60,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    void transferToIndividual_success() {
+    void transferToIndividual_cashbackSuccess_completesAndPublishes() {
         UUID id = UUID.randomUUID();
         Instant now = Instant.now();
         IndividualTransferRequest request = IndividualTransferRequest.builder()
@@ -78,7 +78,7 @@ class PaymentServiceTest {
                 .toAccountNumber("to1")
                 .amount(new BigDecimal("100.50"))
                 .currency(CurrencyCode.RUB)
-                .cashbackNotified(false)
+                .cashbackNotified(true)
                 .createdAt(now)
                 .build();
 
@@ -96,7 +96,9 @@ class PaymentServiceTest {
                 eq(CurrencyCode.RUB)
         );
         assertThat(transferIdCaptor.getValue()).isNotNull();
+        verify(cashbackKafkaProducer).publishIndividualTransfer(any());
         verify(cashbackKafkaProducer, never()).publishLegalEntityTransfer(any());
+        verify(paymentTransferRepository, times(2)).save(any(PaymentTransfer.class));
         verify(accountClient, never()).compensateTransfer(any());
     }
 
@@ -138,6 +140,69 @@ class PaymentServiceTest {
     }
 
     @Test
+    void transferToIndividual_cashbackFails_compensatesAccountAndMarksFailed() {
+        UUID id = UUID.randomUUID();
+        Instant now = Instant.now();
+        IndividualTransferRequest request = IndividualTransferRequest.builder()
+                .fromAccountNumber("from1")
+                .toAccountNumber("to1")
+                .amount(new BigDecimal("50.00"))
+                .currency(CurrencyCode.EUR)
+                .build();
+
+        when(paymentTransferRepository.save(any(PaymentTransfer.class))).thenAnswer(inv -> inv.getArgument(0));
+        doThrow(new CashbackServiceException("down", new RuntimeException("kafka")))
+                .when(cashbackKafkaProducer).publishIndividualTransfer(any());
+
+        assertThatThrownBy(() -> paymentService.transferToIndividual(request))
+                .isInstanceOf(CashbackServiceException.class);
+
+        ArgumentCaptor<UUID> transferIdCaptor = ArgumentCaptor.forClass(UUID.class);
+        verify(accountClient).applyTransfer(
+                transferIdCaptor.capture(),
+                eq("from1"),
+                eq("to1"),
+                eq(new BigDecimal("50.00")),
+                eq(CurrencyCode.EUR)
+        );
+        verify(accountClient).compensateTransfer(transferIdCaptor.getValue());
+        verify(paymentTransferRepository, times(2)).save(any(PaymentTransfer.class));
+    }
+
+    @Test
+    void transferToIndividual_cashbackDisabled_skipsKafka() {
+        ReflectionTestUtils.setField(paymentService, "cashbackEnabled", false);
+        UUID id = UUID.randomUUID();
+        Instant now = Instant.now();
+        IndividualTransferRequest request = IndividualTransferRequest.builder()
+                .fromAccountNumber("a")
+                .toAccountNumber("b")
+                .amount(BigDecimal.TEN)
+                .currency(CurrencyCode.RUB)
+                .build();
+
+        PaymentTransferResponse response = PaymentTransferResponse.builder()
+                .transferId(id)
+                .transferType(TransferType.INDIVIDUAL)
+                .status(PaymentStatus.COMPLETED)
+                .fromAccountNumber("a")
+                .toAccountNumber("b")
+                .amount(BigDecimal.TEN)
+                .currency(CurrencyCode.RUB)
+                .cashbackNotified(false)
+                .createdAt(now)
+                .build();
+
+        when(paymentTransferRepository.save(any(PaymentTransfer.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentMapper.toResponse(any(PaymentTransfer.class))).thenReturn(response);
+
+        assertThat(paymentService.transferToIndividual(request)).isEqualTo(response);
+        verify(cashbackKafkaProducer, never()).publishIndividualTransfer(any());
+        verify(cashbackKafkaProducer, never()).publishLegalEntityTransfer(any());
+        verify(accountClient, never()).compensateTransfer(any());
+    }
+
+    @Test
     void transferToLegalEntity_cashbackSuccess_completesAndNotifies() {
         UUID id = UUID.randomUUID();
         Instant now = Instant.now();
@@ -167,6 +232,7 @@ class PaymentServiceTest {
 
         assertThat(paymentService.transferToLegalEntity(request)).isEqualTo(response);
         verify(cashbackKafkaProducer).publishLegalEntityTransfer(any());
+        verify(cashbackKafkaProducer, never()).publishIndividualTransfer(any());
         verify(paymentTransferRepository, times(2)).save(any(PaymentTransfer.class));
         verify(accountClient, never()).compensateTransfer(any());
     }
@@ -235,6 +301,7 @@ class PaymentServiceTest {
 
         assertThat(paymentService.transferToLegalEntity(request)).isEqualTo(response);
         verify(cashbackKafkaProducer, never()).publishLegalEntityTransfer(any());
+        verify(cashbackKafkaProducer, never()).publishIndividualTransfer(any());
         verify(accountClient, never()).compensateTransfer(any());
     }
 

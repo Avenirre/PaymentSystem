@@ -36,4 +36,5 @@ account:
 cashback:
   enabled: ${CASHBACK_ENABLED:true}
   kafka:
-    topic: ${CASHBACK_KAFKA_TOPIC:cashback.transfer.events}
+    legal-entity-topic: ${CASHBACK_KAFKA_LEGAL_ENTITY_TOPIC:cashback.transfer.events}
+    individual-topic: ${CASHBACK_KAFKA_INDIVIDUAL_TOPIC:cashback.individual.transfer.events}
