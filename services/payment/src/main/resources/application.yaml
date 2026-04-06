@@ -19,6 +19,13 @@ spring:
       enabled: true
     livereload:
       enabled: true
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
 
 server:
   port: 8091
@@ -28,5 +35,5 @@ account:
 
 cashback:
   enabled: ${CASHBACK_ENABLED:true}
-  base-url: ${CASHBACK_SERVICE_URL:http://localhost:8092}
-  notify-path: ${CASHBACK_NOTIFY_PATH:/api/v1/cashback/transfers}
+  kafka:
+    topic: ${CASHBACK_KAFKA_TOPIC:cashback.transfer.events}

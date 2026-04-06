@@ -1,12 +1,12 @@
 package com.rv.ecommerce.services;
 
 import com.rv.ecommerce.account.AccountClient;
-import com.rv.ecommerce.cashback.CashbackClient;
-import com.rv.ecommerce.cashback.CashbackTransferPayload;
 import com.rv.ecommerce.entities.PaymentTransfer;
 import com.rv.ecommerce.entities.PaymentTransfer.PaymentStatus;
 import com.rv.ecommerce.entities.PaymentTransfer.TransferType;
 import com.rv.ecommerce.exceptions.CashbackServiceException;
+import com.rv.ecommerce.kafka.CashbackKafkaProducer;
+import com.rv.ecommerce.kafka.CashbackTransferPayload;
 import com.rv.ecommerce.mappers.PaymentMapper;
 import com.rv.ecommerce.repositories.PaymentTransferRepository;
 import com.rv.ecommerce.requests.IndividualTransferRequest;
@@ -28,7 +28,7 @@ public class PaymentService {
 
     private final PaymentTransferRepository paymentTransferRepository;
     private final PaymentMapper paymentMapper;
-    private final CashbackClient cashbackClient;
+    private final CashbackKafkaProducer cashbackKafkaProducer;
     private final AccountClient accountClient;
 
     @Value("${cashback.enabled:true}")
@@ -99,7 +99,7 @@ public class PaymentService {
 
             if (cashbackEnabled) {
                 try {
-                    cashbackClient.notifyLegalEntityTransfer(new CashbackTransferPayload(
+                    cashbackKafkaProducer.publishLegalEntityTransfer(new CashbackTransferPayload(
                             saved.getId(),
                             saved.getFromAccountNumber(),
                             saved.getToAccountNumber(),
@@ -111,12 +111,12 @@ public class PaymentService {
                     saved.setStatus(PaymentStatus.COMPLETED);
                     saved.setCashbackNotified(true);
                     paymentTransferRepository.save(saved);
-                    log.info("Legal-entity transfer completed with cashback notification transferId={}", saved.getId());
+                    log.info("Legal-entity transfer completed with cashback Kafka event transferId={}", saved.getId());
                 } catch (CashbackServiceException exception) {
                     accountClient.compensateTransfer(transferId);
                     saved.setStatus(PaymentStatus.FAILED);
                     paymentTransferRepository.save(saved);
-                    log.warn("Legal-entity transfer failed cashback, account compensated transferId={}", saved.getId());
+                    log.warn("Legal-entity transfer failed cashback Kafka, account compensated transferId={}", saved.getId());
                     throw exception;
                 }
             } else {
