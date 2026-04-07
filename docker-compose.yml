@@ -118,6 +118,8 @@ services:
       dockerfile: services/cashback/Dockerfile
     container_name: cashback-service
     depends_on:
+      account:
+        condition: service_started
       mongo:
         condition: service_healthy
       kafka:
@@ -128,6 +130,9 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       CASHBACK_KAFKA_LEGAL_ENTITY_TOPIC: ${CASHBACK_KAFKA_LEGAL_ENTITY_TOPIC:-cashback.transfer.events}
       CASHBACK_KAFKA_INDIVIDUAL_TOPIC: ${CASHBACK_KAFKA_INDIVIDUAL_TOPIC:-cashback.individual.transfer.events}
+      ACCOUNT_SERVICE_URL: ${ACCOUNT_SERVICE_URL:-http://account:8090}
+      CASHBACK_SETTLEMENT_ACCOUNT_BASE_URL: ${CASHBACK_SETTLEMENT_ACCOUNT_BASE_URL:-http://account:8090}
+      CASHBACK_SETTLEMENT_SYSTEM_ACCOUNT_NUMBER: ${CASHBACK_SETTLEMENT_SYSTEM_ACCOUNT_NUMBER:-00000000000000000000000000000000}
       SPRING_DEVTOOLS_RESTART_ENABLED: "false"
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
       CASHBACK_RATES_INDIVIDUAL_DEFAULT_PERCENT: ${CASHBACK_RATES_INDIVIDUAL_DEFAULT_PERCENT:-1.0}
