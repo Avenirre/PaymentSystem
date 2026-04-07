@@ -21,6 +21,10 @@ spring:
     producer:
       transaction-id-prefix: test-payment-cashback-
       enable-idempotence: true
+      retries: 3
+      properties:
+        "[retry.backoff.ms]": 300
+        "[delivery.timeout.ms]": 60000
   task:
     scheduling:
       enabled: false

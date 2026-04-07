@@ -28,10 +28,12 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
       transaction-id-prefix: ${SPRING_KAFKA_PRODUCER_TRANSACTION_ID_PREFIX:${spring.application.name}-cashback-}
       enable-idempotence: true
-      retries: 2147483647
+      retries: 3
       properties:
         spring.json.add.type.headers: false
         max.in.flight.requests.per.connection: 5
+        "[retry.backoff.ms]": 300
+        "[delivery.timeout.ms]": 60000
 
 server:
   port: 8091
