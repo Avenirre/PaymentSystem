@@ -9,6 +9,9 @@ spring:
       group-id: ${CASHBACK_KAFKA_CONSUMER_GROUP:cashback-service}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  task:
+    scheduling:
+      time-zone: ${CASHBACK_SETTLEMENT_ZONE_ID:UTC}
 
 server:
   port: 8092
@@ -17,6 +20,13 @@ cashback:
   rates:
     individual-default-percent: ${CASHBACK_RATES_INDIVIDUAL_DEFAULT_PERCENT:1.0}
     legal-entity-default-percent: ${CASHBACK_RATES_LEGAL_ENTITY_DEFAULT_PERCENT:0.5}
+  settlement:
+    enabled: ${CASHBACK_SETTLEMENT_ENABLED:true}
+    account-base-url: ${CASHBACK_SETTLEMENT_ACCOUNT_BASE_URL:${ACCOUNT_SERVICE_URL:http://localhost:8090}}
+    system-account-number: ${CASHBACK_SETTLEMENT_SYSTEM_ACCOUNT_NUMBER:00000000000000000000000000000000}
+    zone-id: ${CASHBACK_SETTLEMENT_ZONE_ID:UTC}
+    schedule-cron: ${CASHBACK_SETTLEMENT_SCHEDULE_CRON:0 5 0 1 * ?}
+    minimum-payout-amount: ${CASHBACK_SETTLEMENT_MINIMUM_PAYOUT_AMOUNT:0.01}
   kafka:
     legal-entity-topic: ${CASHBACK_KAFKA_LEGAL_ENTITY_TOPIC:cashback.transfer.events}
     individual-topic: ${CASHBACK_KAFKA_INDIVIDUAL_TOPIC:cashback.individual.transfer.events}

@@ -6,3 +6,10 @@ cashback:
   rates:
     individual-default-percent: 1.0
     legal-entity-default-percent: 0.5
+  settlement:
+    enabled: false
+    account-base-url: http://127.0.0.1:8090
+    system-account-number: "00000000000000000000000000000000"
+    zone-id: UTC
+    schedule-cron: "0 0 0 1 * ?"
+    minimum-payout-amount: 0.01
