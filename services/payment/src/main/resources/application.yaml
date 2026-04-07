@@ -6,6 +6,8 @@ spring:
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
   jpa:
     hibernate:
       ddl-auto: update
@@ -24,8 +26,12 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      transaction-id-prefix: ${SPRING_KAFKA_PRODUCER_TRANSACTION_ID_PREFIX:${spring.application.name}-cashback-}
+      enable-idempotence: true
+      retries: 2147483647
       properties:
         spring.json.add.type.headers: false
+        max.in.flight.requests.per.connection: 5
 
 server:
   port: 8091
@@ -38,3 +44,6 @@ cashback:
   kafka:
     legal-entity-topic: ${CASHBACK_KAFKA_LEGAL_ENTITY_TOPIC:cashback.transfer.events}
     individual-topic: ${CASHBACK_KAFKA_INDIVIDUAL_TOPIC:cashback.individual.transfer.events}
+  outbox:
+    publish-interval-ms: ${CASHBACK_OUTBOX_PUBLISH_INTERVAL_MS:500}
+    batch-size: ${CASHBACK_OUTBOX_BATCH_SIZE:50}

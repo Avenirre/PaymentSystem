@@ -17,6 +17,11 @@
     <name>payment-system</name>
     <description>Payment system — multi-module parent</description>
 
+    <properties>
+        <!-- Override Spring Boot BOM: 5.0.x may be unavailable on some mirrors; 4.31.x is on Maven Central -->
+        <liquibase.version>4.31.1</liquibase.version>
+    </properties>
+
     <modules>
         <module>services/account</module>
         <module>services/payment</module>

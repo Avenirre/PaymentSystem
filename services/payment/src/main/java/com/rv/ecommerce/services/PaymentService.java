@@ -1,14 +1,18 @@
 package com.rv.ecommerce.services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rv.ecommerce.account.AccountClient;
+import com.rv.ecommerce.entities.CashbackOutbox;
+import com.rv.ecommerce.entities.CashbackOutboxEventType;
+import com.rv.ecommerce.entities.CashbackOutboxStatus;
 import com.rv.ecommerce.entities.PaymentTransfer;
 import com.rv.ecommerce.entities.PaymentTransfer.PaymentStatus;
 import com.rv.ecommerce.entities.PaymentTransfer.TransferType;
-import com.rv.ecommerce.exceptions.CashbackServiceException;
-import com.rv.ecommerce.kafka.CashbackKafkaProducer;
 import com.rv.ecommerce.kafka.CashbackTransferPayload;
 import com.rv.ecommerce.kafka.IndividualCashbackPayload;
 import com.rv.ecommerce.mappers.PaymentMapper;
+import com.rv.ecommerce.repositories.CashbackOutboxRepository;
 import com.rv.ecommerce.repositories.PaymentTransferRepository;
 import com.rv.ecommerce.requests.IndividualTransferRequest;
 import com.rv.ecommerce.requests.LegalEntityTransferRequest;
@@ -20,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -29,13 +34,20 @@ public class PaymentService {
 
     private final PaymentTransferRepository paymentTransferRepository;
     private final PaymentMapper paymentMapper;
-    private final CashbackKafkaProducer cashbackKafkaProducer;
+    private final CashbackOutboxRepository cashbackOutboxRepository;
+    private final ObjectMapper objectMapper;
     private final AccountClient accountClient;
 
     @Value("${cashback.enabled:true}")
     private boolean cashbackEnabled;
 
-    @Transactional(isolation = Isolation.SERIALIZABLE, noRollbackFor = CashbackServiceException.class)
+    @Value("${cashback.kafka.legal-entity-topic}")
+    private String legalEntityTopic;
+
+    @Value("${cashback.kafka.individual-topic}")
+    private String individualTopic;
+
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public PaymentTransferResponse transferToIndividual(IndividualTransferRequest request) {
         UUID transferId = UUID.randomUUID();
         boolean accountApplied = false;
@@ -62,25 +74,11 @@ public class PaymentService {
             PaymentTransfer saved = paymentTransferRepository.save(entity);
 
             if (cashbackEnabled) {
-                try {
-                    cashbackKafkaProducer.publishIndividualTransfer(new IndividualCashbackPayload(
-                            saved.getId(),
-                            saved.getFromAccountNumber(),
-                            saved.getToAccountNumber(),
-                            saved.getAmount(),
-                            saved.getCurrency().name()
-                    ));
-                    saved.setStatus(PaymentStatus.COMPLETED);
-                    saved.setCashbackNotified(true);
-                    paymentTransferRepository.save(saved);
-                    log.info("Individual transfer completed with cashback Kafka event transferId={}", saved.getId());
-                } catch (CashbackServiceException exception) {
-                    accountClient.compensateTransfer(transferId);
-                    saved.setStatus(PaymentStatus.FAILED);
-                    paymentTransferRepository.save(saved);
-                    log.warn("Individual transfer failed cashback Kafka, account compensated transferId={}", saved.getId());
-                    throw exception;
-                }
+                enqueueIndividualCashback(saved);
+                saved.setStatus(PaymentStatus.COMPLETED);
+                saved.setCashbackNotified(true);
+                paymentTransferRepository.save(saved);
+                log.info("Individual transfer completed, cashback outbox enqueued transferId={}", saved.getId());
             } else {
                 saved.setStatus(PaymentStatus.COMPLETED);
                 paymentTransferRepository.save(saved);
@@ -88,8 +86,8 @@ public class PaymentService {
             }
 
             return paymentMapper.toResponse(saved);
-        } catch (CashbackServiceException e) {
-            throw e;
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize cashback outbox payload", e);
         } catch (RuntimeException e) {
             if (accountApplied) {
                 compensateSafely(transferId);
@@ -98,7 +96,7 @@ public class PaymentService {
         }
     }
 
-    @Transactional(isolation = Isolation.SERIALIZABLE, noRollbackFor = CashbackServiceException.class)
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public PaymentTransferResponse transferToLegalEntity(LegalEntityTransferRequest request) {
         UUID transferId = UUID.randomUUID();
         boolean accountApplied = false;
@@ -127,27 +125,11 @@ public class PaymentService {
             PaymentTransfer saved = paymentTransferRepository.save(entity);
 
             if (cashbackEnabled) {
-                try {
-                    cashbackKafkaProducer.publishLegalEntityTransfer(new CashbackTransferPayload(
-                            saved.getId(),
-                            saved.getFromAccountNumber(),
-                            saved.getToAccountNumber(),
-                            saved.getAmount(),
-                            saved.getCurrency().name(),
-                            saved.getLegalEntityInn(),
-                            saved.getLegalEntityName()
-                    ));
-                    saved.setStatus(PaymentStatus.COMPLETED);
-                    saved.setCashbackNotified(true);
-                    paymentTransferRepository.save(saved);
-                    log.info("Legal-entity transfer completed with cashback Kafka event transferId={}", saved.getId());
-                } catch (CashbackServiceException exception) {
-                    accountClient.compensateTransfer(transferId);
-                    saved.setStatus(PaymentStatus.FAILED);
-                    paymentTransferRepository.save(saved);
-                    log.warn("Legal-entity transfer failed cashback Kafka, account compensated transferId={}", saved.getId());
-                    throw exception;
-                }
+                enqueueLegalEntityCashback(saved);
+                saved.setStatus(PaymentStatus.COMPLETED);
+                saved.setCashbackNotified(true);
+                paymentTransferRepository.save(saved);
+                log.info("Legal-entity transfer completed, cashback outbox enqueued transferId={}", saved.getId());
             } else {
                 saved.setStatus(PaymentStatus.COMPLETED);
                 paymentTransferRepository.save(saved);
@@ -155,14 +137,58 @@ public class PaymentService {
             }
 
             return paymentMapper.toResponse(saved);
-        } catch (CashbackServiceException e) {
-            throw e;
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize cashback outbox payload", e);
         } catch (RuntimeException e) {
             if (accountApplied) {
                 compensateSafely(transferId);
             }
             throw e;
         }
+    }
+
+    private void enqueueIndividualCashback(PaymentTransfer saved) throws JsonProcessingException {
+        IndividualCashbackPayload payload = new IndividualCashbackPayload(
+                saved.getId(),
+                saved.getFromAccountNumber(),
+                saved.getToAccountNumber(),
+                saved.getAmount(),
+                saved.getCurrency().name()
+        );
+        cashbackOutboxRepository.save(CashbackOutbox.builder()
+                .id(UUID.randomUUID())
+                .aggregateId(saved.getId())
+                .eventType(CashbackOutboxEventType.INDIVIDUAL_CASHBACK)
+                .topic(individualTopic)
+                .partitionKey(saved.getId().toString())
+                .payloadJson(objectMapper.writeValueAsString(payload))
+                .status(CashbackOutboxStatus.PENDING)
+                .createdAt(Instant.now())
+                .attemptCount(0)
+                .build());
+    }
+
+    private void enqueueLegalEntityCashback(PaymentTransfer saved) throws JsonProcessingException {
+        CashbackTransferPayload payload = new CashbackTransferPayload(
+                saved.getId(),
+                saved.getFromAccountNumber(),
+                saved.getToAccountNumber(),
+                saved.getAmount(),
+                saved.getCurrency().name(),
+                saved.getLegalEntityInn(),
+                saved.getLegalEntityName()
+        );
+        cashbackOutboxRepository.save(CashbackOutbox.builder()
+                .id(UUID.randomUUID())
+                .aggregateId(saved.getId())
+                .eventType(CashbackOutboxEventType.LEGAL_ENTITY_CASHBACK)
+                .topic(legalEntityTopic)
+                .partitionKey(saved.getId().toString())
+                .payloadJson(objectMapper.writeValueAsString(payload))
+                .status(CashbackOutboxStatus.PENDING)
+                .createdAt(Instant.now())
+                .attemptCount(0)
+                .build());
     }
 
     private void compensateSafely(UUID transferId) {
