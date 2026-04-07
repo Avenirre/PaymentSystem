@@ -4,6 +4,9 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+  # Схема из сущностей: Liquibase+uuid на H2 часто ломает validate; в проде по-прежнему Liquibase из main application.yaml
+  liquibase:
+    enabled: false
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -15,12 +18,21 @@ spring:
       enabled: false
   kafka:
     bootstrap-servers: localhost:9092
+    producer:
+      transaction-id-prefix: test-payment-cashback-
+      enable-idempotence: true
+  task:
+    scheduling:
+      enabled: false
 
 cashback:
   enabled: false
   kafka:
     legal-entity-topic: cashback.transfer.events.test
     individual-topic: cashback.individual.transfer.events.test
+  outbox:
+    publish-interval-ms: 60000
+    batch-size: 10
 
 account:
   base-url: http://localhost:8090

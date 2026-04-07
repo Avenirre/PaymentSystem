@@ -1,0 +1,4 @@
+databaseChangeLog:
+  - include:
+      file: v1/001-cashback-outbox.yaml
+      relativeToChangelogFile: true
