@@ -33,7 +33,6 @@ public class CashbackService {
     public BigDecimal getEffectivePercent(CashbackType cashbackType) {
         return cashbackRepository.findById(cashbackType.name())
                 .map(CashbackDocument::getPercent)
-                .filter(p -> p != null)
                 .orElseGet(() -> defaultPercentFromConfiguration(cashbackType));
     }
 

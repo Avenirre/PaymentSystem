@@ -22,9 +22,11 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -63,42 +65,37 @@ public class MonthlyCashbackSettlementService {
         Instant end = yearMonth.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant();
         String ym = yearMonth.toString();
 
-        Map<String, BigDecimal> sums = new HashMap<>();
-        mergeAggregation(sums, aggregateCollection(LEGAL_ENTITY_ACCRUALS, start, end));
-        mergeAggregation(sums, aggregateCollection(INDIVIDUAL_ACCRUALS, start, end));
+        Map<String, BigDecimal> sums = aggregateTotals(start, end);
 
         log.info("Monthly settlement for {}: {} payout bucket(s)", ym, sums.size());
 
-        for (Map.Entry<String, BigDecimal> e : sums.entrySet()) {
-            String[] keyParts = e.getKey().split("\\|", 2);
-            if (keyParts.length != 2) {
-                continue;
-            }
-            String beneficiary = keyParts[0];
-            String currency = keyParts[1];
-            BigDecimal amount = e.getValue().setScale(2, RoundingMode.HALF_UP);
-            if (amount.compareTo(settlement.minimumPayoutAmount()) < 0) {
-                continue;
-            }
-            payoutIfNeeded(ym, yearMonth, beneficiary, currency, amount);
-        }
+        sums.entrySet().stream()
+                .map(e -> PayoutLine.fromEntry(e.getKey(), e.getValue()))
+                .flatMap(Optional::stream)
+                .filter(line -> line.amount().compareTo(settlement.minimumPayoutAmount()) >= 0)
+                .forEach(line -> payoutIfNeeded(ym, yearMonth, line.beneficiary(), line.currency(), line.amount()));
     }
 
-    private void mergeAggregation(Map<String, BigDecimal> sums, AggregationResults<Document> results) {
-        for (Document doc : results.getMappedResults()) {
-            Document id = doc.get("_id", Document.class);
-            if (id == null) {
-                continue;
-            }
-            String from = id.getString("fromAccountNumber");
-            String currencyCode = id.getString("currencyCode");
-            if (from == null || currencyCode == null) {
-                continue;
-            }
-            BigDecimal total = toBigDecimal(doc.get("total"));
-            String key = from + "|" + currencyCode;
-            sums.merge(key, total, BigDecimal::add);
+    private Map<String, BigDecimal> aggregateTotals(Instant start, Instant end) {
+        return Stream.of(LEGAL_ENTITY_ACCRUALS, INDIVIDUAL_ACCRUALS)
+                .flatMap(collection -> aggregateCollection(collection, start, end).getMappedResults().stream())
+                .map(this::toAmountBucket)
+                .flatMap(Optional::stream)
+                .collect(Collectors.toMap(AmountBucket::key, AmountBucket::amount, BigDecimal::add));
+    }
+
+    private Optional<AmountBucket> toAmountBucket(Document doc) {
+        Document id = doc.get("_id", Document.class);
+        if (id == null) {
+            return Optional.empty();
         }
+        String from = id.getString("fromAccountNumber");
+        String currencyCode = id.getString("currencyCode");
+        if (from == null || currencyCode == null) {
+            return Optional.empty();
+        }
+        String key = from + "|" + currencyCode;
+        return Optional.of(new AmountBucket(key, toBigDecimal(doc.get("total"))));
     }
 
     private AggregationResults<Document> aggregateCollection(String collection, Instant start, Instant end) {
@@ -114,16 +111,12 @@ public class MonthlyCashbackSettlementService {
     }
 
     private static BigDecimal toBigDecimal(Object value) {
-        if (value == null) {
-            return BigDecimal.ZERO;
-        }
-        if (value instanceof BigDecimal bd) {
-            return bd;
-        }
-        if (value instanceof Decimal128 d128) {
-            return d128.bigDecimalValue();
-        }
-        return new BigDecimal(value.toString());
+        return switch (value) {
+            case null -> BigDecimal.ZERO;
+            case BigDecimal bd -> bd;
+            case Decimal128 d128 -> d128.bigDecimalValue();
+            default -> new BigDecimal(value.toString());
+        };
     }
 
     private void payoutIfNeeded(String yearMonthStr, YearMonth yearMonth, String beneficiary, String currency, BigDecimal amount) {
@@ -204,5 +197,19 @@ public class MonthlyCashbackSettlementService {
         doc.setLastError(shortError);
         doc.setPaidAt(null);
         payoutRepository.save(doc);
+    }
+
+    private record AmountBucket(String key, BigDecimal amount) {
+    }
+
+    private record PayoutLine(String beneficiary, String currency, BigDecimal amount) {
+        static Optional<PayoutLine> fromEntry(String compositeKey, BigDecimal rawTotal) {
+            String[] parts = compositeKey.split("\\|", 2);
+            if (parts.length != 2) {
+                return Optional.empty();
+            }
+            BigDecimal amount = rawTotal.setScale(2, RoundingMode.HALF_UP);
+            return Optional.of(new PayoutLine(parts[0], parts[1], amount));
+        }
     }
 }
