@@ -1,6 +1,6 @@
 package com.rv.ecommerce.services;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.rv.ecommerce.account.AccountClient;
 import com.rv.ecommerce.entities.CashbackOutbox;
 import com.rv.ecommerce.entities.CashbackOutboxEventType;
@@ -60,7 +60,7 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(paymentService, "objectMapper", new ObjectMapper().findAndRegisterModules());
+        ReflectionTestUtils.setField(paymentService, "jsonMapper", JsonMapper.builder().findAndAddModules().build());
         ReflectionTestUtils.setField(paymentService, "cashbackEnabled", true);
         ReflectionTestUtils.setField(paymentService, "legalEntityTopic", "le-topic");
         ReflectionTestUtils.setField(paymentService, "individualTopic", "ind-topic");
