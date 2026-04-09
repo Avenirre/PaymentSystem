@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * Uses a single JPA {@link Transactional} boundary: synchronous {@link KafkaTemplate#send} + flush
  * before marking rows {@link CashbackOutboxStatus#PUBLISHED}. On send failure the transaction rolls back
- * (rows stay PENDING). {@code ChainedTransactionManager} is not used — it was removed in Spring Framework 6.2;
+ * (rows stay PENDING).
  * cashback consumer idempotency covers rare duplicate delivery if Kafka committed before DB.
  */
 @Component
@@ -46,16 +46,22 @@ public class CashbackOutboxPublisher {
         if (rows.isEmpty()) {
             return;
         }
-        for (CashbackOutbox row : rows) {
-            Object payload = deserialize(row);
-            try {
-                kafkaTemplate.send(row.getTopic(), row.getPartitionKey(), payload)
-                        .get(30, TimeUnit.SECONDS);
-            } catch (Exception e) {
-                throw new IllegalStateException("Kafka send failed for outbox id=" + row.getId(), e);
-            }
-            row.setStatus(CashbackOutboxStatus.PUBLISHED);
-            row.setPublishedAt(Instant.now());
+        rows.forEach(this::publishRow);
+    }
+
+    private void publishRow(CashbackOutbox row) {
+        Object payload = deserialize(row);
+        sendToKafka(row, payload);
+        row.setStatus(CashbackOutboxStatus.PUBLISHED);
+        row.setPublishedAt(Instant.now());
+    }
+
+    private void sendToKafka(CashbackOutbox row, Object payload) {
+        try {
+            kafkaTemplate.send(row.getTopic(), row.getPartitionKey(), payload)
+                    .get(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new IllegalStateException("Kafka send failed for outbox id=" + row.getId(), e);
         }
     }
 
