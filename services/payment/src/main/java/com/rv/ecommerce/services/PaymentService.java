@@ -1,7 +1,6 @@
 package com.rv.ecommerce.services;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.rv.ecommerce.account.AccountClient;
 import com.rv.ecommerce.entities.CashbackOutbox;
 import com.rv.ecommerce.entities.CashbackOutboxEventType;
@@ -35,7 +34,7 @@ public class PaymentService {
     private final PaymentTransferRepository paymentTransferRepository;
     private final PaymentMapper paymentMapper;
     private final CashbackOutboxRepository cashbackOutboxRepository;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
     private final AccountClient accountClient;
 
     @Value("${cashback.enabled:true}")
@@ -86,8 +85,6 @@ public class PaymentService {
             }
 
             return paymentMapper.toResponse(saved);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize cashback outbox payload", e);
         } catch (RuntimeException e) {
             if (accountApplied) {
                 compensateSafely(transferId);
@@ -137,8 +134,6 @@ public class PaymentService {
             }
 
             return paymentMapper.toResponse(saved);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize cashback outbox payload", e);
         } catch (RuntimeException e) {
             if (accountApplied) {
                 compensateSafely(transferId);
@@ -147,7 +142,7 @@ public class PaymentService {
         }
     }
 
-    private void enqueueIndividualCashback(PaymentTransfer saved) throws JsonProcessingException {
+    private void enqueueIndividualCashback(PaymentTransfer saved) {
         IndividualCashbackPayload payload = new IndividualCashbackPayload(
                 saved.getId(),
                 saved.getFromAccountNumber(),
@@ -161,14 +156,14 @@ public class PaymentService {
                 .eventType(CashbackOutboxEventType.INDIVIDUAL_CASHBACK)
                 .topic(individualTopic)
                 .partitionKey(saved.getId().toString())
-                .payloadJson(objectMapper.writeValueAsString(payload))
+                .payloadJson(jsonMapper.writeValueAsString(payload))
                 .status(CashbackOutboxStatus.PENDING)
                 .createdAt(Instant.now())
                 .attemptCount(0)
                 .build());
     }
 
-    private void enqueueLegalEntityCashback(PaymentTransfer saved) throws JsonProcessingException {
+    private void enqueueLegalEntityCashback(PaymentTransfer saved) {
         CashbackTransferPayload payload = new CashbackTransferPayload(
                 saved.getId(),
                 saved.getFromAccountNumber(),
@@ -184,7 +179,7 @@ public class PaymentService {
                 .eventType(CashbackOutboxEventType.LEGAL_ENTITY_CASHBACK)
                 .topic(legalEntityTopic)
                 .partitionKey(saved.getId().toString())
-                .payloadJson(objectMapper.writeValueAsString(payload))
+                .payloadJson(jsonMapper.writeValueAsString(payload))
                 .status(CashbackOutboxStatus.PENDING)
                 .createdAt(Instant.now())
                 .attemptCount(0)

@@ -1,6 +1,6 @@
 package com.rv.ecommerce.controllers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.rv.ecommerce.entities.PaymentTransfer.CurrencyCode;
 import com.rv.ecommerce.entities.PaymentTransfer.PaymentStatus;
 import com.rv.ecommerce.entities.PaymentTransfer.TransferType;
@@ -37,7 +37,7 @@ class PaymentControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    private final JsonMapper jsonMapper = JsonMapper.builder().findAndAddModules().build();
 
     @MockitoBean
     private PaymentService paymentService;
@@ -69,7 +69,7 @@ class PaymentControllerTest {
 
         mockMvc.perform(post("/api/v1/payments/transfers/individual")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.transferId").value(id.toString()))
                 .andExpect(jsonPath("$.fromAccountNumber").value("a1"));
@@ -79,7 +79,7 @@ class PaymentControllerTest {
     void transferIndividual_invalidBody_returns400() throws Exception {
         mockMvc.perform(post("/api/v1/payments/transfers/individual")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("currency", "RUB"))))
+                        .content(jsonMapper.writeValueAsString(Map.of("currency", "RUB"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
@@ -113,7 +113,7 @@ class PaymentControllerTest {
 
         mockMvc.perform(post("/api/v1/payments/transfers/legal-entity")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.transferId").value(id.toString()))
                 .andExpect(jsonPath("$.cashbackNotified").value(true));
@@ -135,7 +135,7 @@ class PaymentControllerTest {
 
         mockMvc.perform(post("/api/v1/payments/transfers/legal-entity")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.code").value("CASHBACK_SERVICE_ERROR"));
     }

@@ -1,7 +1,7 @@
 package com.rv.ecommerce.outbox;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 import com.rv.ecommerce.entities.CashbackOutbox;
 import com.rv.ecommerce.entities.CashbackOutboxStatus;
 import com.rv.ecommerce.kafka.CashbackTransferPayload;
@@ -34,7 +34,7 @@ public class CashbackOutboxPublisher {
 
     private final CashbackOutboxRepository cashbackOutboxRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
     @Value("${cashback.outbox.batch-size:50}")
     private int batchSize;
@@ -62,12 +62,12 @@ public class CashbackOutboxPublisher {
     private Object deserialize(CashbackOutbox row) {
         try {
             return switch (row.getEventType()) {
-                case LEGAL_ENTITY_CASHBACK -> objectMapper.readValue(
+                case LEGAL_ENTITY_CASHBACK -> jsonMapper.readValue(
                         row.getPayloadJson(), CashbackTransferPayload.class);
-                case INDIVIDUAL_CASHBACK -> objectMapper.readValue(
+                case INDIVIDUAL_CASHBACK -> jsonMapper.readValue(
                         row.getPayloadJson(), IndividualCashbackPayload.class);
             };
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Invalid outbox payload id=" + row.getId(), e);
         }
     }
