@@ -3,6 +3,7 @@ package com.rv.ecommerce.services;
 import com.rv.ecommerce.account.AccountApplyTransferRequest;
 import com.rv.ecommerce.account.AccountTransferClient;
 import com.rv.ecommerce.config.CashbackSettlementProperties;
+import com.rv.ecommerce.notification.CashbackNotificationPublisher;
 import com.rv.ecommerce.entities.MonthlyCashbackPayoutDocument;
 import com.rv.ecommerce.entities.MonthlyCashbackPayoutStatus;
 import com.rv.ecommerce.repositories.MonthlyCashbackPayoutRepository;
@@ -40,6 +41,7 @@ public class MonthlyCashbackSettlementService {
     private final CashbackSettlementProperties settlement;
     private final MonthlyCashbackPayoutRepository payoutRepository;
     private final AccountTransferClient accountTransferClient;
+    private final CashbackNotificationPublisher cashbackNotificationPublisher;
 
     /**
      * Settles cashback for the previous calendar month in the configured zone (payer account = {@code fromAccountNumber}).
@@ -141,6 +143,10 @@ public class MonthlyCashbackSettlementService {
             accountTransferClient.applyTransfer(request);
             upsertPaid(yearMonthStr, docId, beneficiary, currency, amount, transferId);
             log.info("Monthly payout applied: period={} beneficiary={} currency={} amount={}", yearMonthStr, beneficiary, currency, amount);
+            if (settlement.payoutNotificationEmail() != null && !settlement.payoutNotificationEmail().isBlank()) {
+                cashbackNotificationPublisher.publishMonthlyCashbackPayout(
+                        yearMonthStr, beneficiary, currency, amount, transferId, settlement.payoutNotificationEmail());
+            }
         } catch (Exception ex) {
             log.error("Monthly payout failed: period={} beneficiary={} currency={} amount={}", yearMonthStr, beneficiary, currency, amount, ex);
             upsertFailed(yearMonthStr, docId, beneficiary, currency, amount, transferId, ex.getMessage());

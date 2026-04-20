@@ -16,6 +16,8 @@ public record CashbackSettlementProperties(
         @NotBlank String systemAccountNumber,
         @NotBlank String zoneId,
         @NotBlank String scheduleCron,
-        @NotNull @DecimalMin("0.01") BigDecimal minimumPayoutAmount
+        @NotNull @DecimalMin("0.01") BigDecimal minimumPayoutAmount,
+        /** If set, monthly cashback email notifications are sent to this address. */
+        String payoutNotificationEmail
 ) {
 }
