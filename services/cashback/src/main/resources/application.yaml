@@ -27,6 +27,10 @@ cashback:
     zone-id: ${CASHBACK_SETTLEMENT_ZONE_ID:UTC}
     schedule-cron: ${CASHBACK_SETTLEMENT_SCHEDULE_CRON:0 5 0 1 * ?}
     minimum-payout-amount: ${CASHBACK_SETTLEMENT_MINIMUM_PAYOUT_AMOUNT:0.01}
+    payout-notification-email: ${CASHBACK_SETTLEMENT_PAYOUT_NOTIFICATION_EMAIL:}
   kafka:
     legal-entity-topic: ${CASHBACK_KAFKA_LEGAL_ENTITY_TOPIC:cashback.transfer.events}
     individual-topic: ${CASHBACK_KAFKA_INDIVIDUAL_TOPIC:cashback.individual.transfer.events}
+
+notification:
+  kafka-topic: ${NOTIFICATION_KAFKA_TOPIC:business.notification.events}

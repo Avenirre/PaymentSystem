@@ -13,3 +13,7 @@ cashback:
     zone-id: UTC
     schedule-cron: "0 0 0 1 * ?"
     minimum-payout-amount: 0.01
+    payout-notification-email: ""
+
+notification:
+  kafka-topic: business.notification.events.test
