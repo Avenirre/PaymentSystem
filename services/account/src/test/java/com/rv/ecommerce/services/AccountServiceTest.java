@@ -9,6 +9,7 @@ import com.rv.ecommerce.exceptions.AccountCreationException;
 import com.rv.ecommerce.exceptions.InsufficientFundsException;
 import com.rv.ecommerce.exceptions.InvalidTransferException;
 import com.rv.ecommerce.mappers.AccountMapper;
+import com.rv.ecommerce.notification.BusinessNotificationPublisher;
 import com.rv.ecommerce.repositories.AccountRepository;
 import com.rv.ecommerce.repositories.AccountTransferLedgerRepository;
 import com.rv.ecommerce.requests.AccountRequest;
@@ -49,6 +50,9 @@ class AccountServiceTest {
 
     @Mock
     private AccountMapper accountMapper;
+
+    @Mock
+    private BusinessNotificationPublisher businessNotificationPublisher;
 
     @InjectMocks
     private AccountService accountService;
@@ -98,6 +102,7 @@ class AccountServiceTest {
 
         assertThat(result).isEqualTo(response);
         verify(accountRepository).save(entity);
+        verify(businessNotificationPublisher).publishAccountCreated(response, request);
     }
 
     @Test
@@ -121,6 +126,8 @@ class AccountServiceTest {
                 .isInstanceOf(AccountCreationException.class)
                 .hasMessageContaining("Failed to create account")
                 .hasCauseInstanceOf(IllegalStateException.class);
+
+        verify(businessNotificationPublisher, never()).publishAccountCreated(any(), any());
     }
 
     @Test

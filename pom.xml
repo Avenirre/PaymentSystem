@@ -23,8 +23,10 @@
     </properties>
 
     <modules>
+        <module>libs/notification-events</module>
         <module>services/account</module>
         <module>services/payment</module>
         <module>services/cashback</module>
+        <module>services/notification</module>
     </modules>
 </project>

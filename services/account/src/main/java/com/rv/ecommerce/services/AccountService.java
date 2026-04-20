@@ -9,6 +9,7 @@ import com.rv.ecommerce.exceptions.AccountCreationException;
 import com.rv.ecommerce.exceptions.InsufficientFundsException;
 import com.rv.ecommerce.exceptions.InvalidTransferException;
 import com.rv.ecommerce.mappers.AccountMapper;
+import com.rv.ecommerce.notification.BusinessNotificationPublisher;
 import com.rv.ecommerce.repositories.AccountRepository;
 import com.rv.ecommerce.repositories.AccountTransferLedgerRepository;
 import com.rv.ecommerce.requests.AccountRequest;
@@ -32,6 +33,7 @@ public class AccountService {
     private final AccountRepository accountRepository;
     private final AccountTransferLedgerRepository accountTransferLedgerRepository;
     private final AccountMapper accountMapper;
+    private final BusinessNotificationPublisher businessNotificationPublisher;
 
     public AccountResponse createAccount(AccountRequest request) {
         log.info("Creating account for ownerId={}", request.ownerId());
@@ -42,6 +44,7 @@ public class AccountService {
                     accountMapper.toEntity(request, generatedAccountNumber)
             ));
             log.info("Account created successfully: accountNumber={}, ownerId={}", response.accountNumber(), response.ownerId());
+            businessNotificationPublisher.publishAccountCreated(response, request);
             return response;
         } catch (Exception exception) {
             log.error("Failed to create account for ownerId={}", request.ownerId(), exception);

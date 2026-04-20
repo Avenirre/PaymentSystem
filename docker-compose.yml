@@ -1,4 +1,4 @@
-# Запуск Postgres + Mongo + Kafka + account + payment + cashback из корня репозитория:
+# Запуск Postgres + Mongo + Kafka + MailHog + account + payment + cashback + notification из корня репозитория:
 #   docker compose up --build -d
 
 services:
@@ -37,6 +37,13 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
 
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: paymentsystem-mailhog
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+
   mongo:
     image: mongo:7
     container_name: paymentsystem-mongo
@@ -62,6 +69,7 @@ services:
     volumes:
       - paymentsystem-postgres-data:/var/lib/postgresql/data
       - ./services/account/docker/init-create-payment-db.sql:/docker-entrypoint-initdb.d/02-create-payment.sql
+      - ./services/account/docker/init-create-notification-db.sql:/docker-entrypoint-initdb.d/03-create-notification.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -76,12 +84,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME_ACCOUNT:-account}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-postgres}
       SPRING_DEVTOOLS_RESTART_ENABLED: "false"
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      NOTIFICATION_KAFKA_TOPIC: ${NOTIFICATION_KAFKA_TOPIC:-business.notification.events}
     ports:
       - "${ACCOUNT_PORT:-8090}:8090"
 
@@ -109,6 +121,7 @@ services:
       CASHBACK_ENABLED: ${CASHBACK_ENABLED:-true}
       CASHBACK_KAFKA_LEGAL_ENTITY_TOPIC: ${CASHBACK_KAFKA_LEGAL_ENTITY_TOPIC:-cashback.transfer.events}
       CASHBACK_KAFKA_INDIVIDUAL_TOPIC: ${CASHBACK_KAFKA_INDIVIDUAL_TOPIC:-cashback.individual.transfer.events}
+      NOTIFICATION_KAFKA_TOPIC: ${NOTIFICATION_KAFKA_TOPIC:-business.notification.events}
     ports:
       - "${PAYMENT_PORT:-8091}:8091"
 
@@ -137,8 +150,35 @@ services:
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
       CASHBACK_RATES_INDIVIDUAL_DEFAULT_PERCENT: ${CASHBACK_RATES_INDIVIDUAL_DEFAULT_PERCENT:-1.0}
       CASHBACK_RATES_LEGAL_ENTITY_DEFAULT_PERCENT: ${CASHBACK_RATES_LEGAL_ENTITY_DEFAULT_PERCENT:-0.5}
+      NOTIFICATION_KAFKA_TOPIC: ${NOTIFICATION_KAFKA_TOPIC:-business.notification.events}
+      CASHBACK_SETTLEMENT_PAYOUT_NOTIFICATION_EMAIL: ${CASHBACK_SETTLEMENT_PAYOUT_NOTIFICATION_EMAIL:-}
     ports:
       - "${CASHBACK_PORT:-8092}:8092"
+
+  notification:
+    build:
+      context: .
+      dockerfile: services/notification/Dockerfile
+    container_name: notification-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      mailhog:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME_NOTIFICATION:-notification}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-postgres}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      NOTIFICATION_KAFKA_TOPIC: ${NOTIFICATION_KAFKA_TOPIC:-business.notification.events}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailhog}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
+      SPRING_DEVTOOLS_RESTART_ENABLED: "false"
+      SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "false"
+    ports:
+      - "${NOTIFICATION_PORT:-8093}:8093"
 
 volumes:
   paymentsystem-postgres-data:

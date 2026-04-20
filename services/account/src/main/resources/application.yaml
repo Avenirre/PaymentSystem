@@ -19,6 +19,15 @@ spring:
       enabled: true
     livereload:
       enabled: true
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+
+notification:
+  kafka-topic: ${NOTIFICATION_KAFKA_TOPIC:business.notification.events}
 
 server:
   port: 8090
