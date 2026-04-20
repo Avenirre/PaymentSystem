@@ -1,6 +1,7 @@
 package com.rv.ecommerce.requests;
 
 import com.rv.ecommerce.entities.PaymentTransfer.CurrencyCode;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -16,6 +17,8 @@ public record LegalEntityTransferRequest(
         @NotNull @Positive BigDecimal amount,
         @NotNull CurrencyCode currency,
         @NotBlank @Size(min = 10, max = 12) String legalEntityInn,
-        @NotBlank String legalEntityName
+        @NotBlank String legalEntityName,
+        @Email String senderEmail,
+        @Email String recipientEmail
 ) {
 }

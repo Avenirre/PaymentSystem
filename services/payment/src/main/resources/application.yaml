@@ -41,6 +41,9 @@ server:
 account:
   base-url: ${ACCOUNT_SERVICE_URL:http://localhost:8090}
 
+notification:
+  kafka-topic: ${NOTIFICATION_KAFKA_TOPIC:business.notification.events}
+
 cashback:
   enabled: ${CASHBACK_ENABLED:true}
   kafka:
