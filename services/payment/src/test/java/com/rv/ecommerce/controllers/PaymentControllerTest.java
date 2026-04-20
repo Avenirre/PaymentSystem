@@ -51,6 +51,8 @@ class PaymentControllerTest {
                 .toAccountNumber("b1")
                 .amount(new BigDecimal("10.00"))
                 .currency(CurrencyCode.RUB)
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         PaymentTransferResponse response = PaymentTransferResponse.builder()
@@ -95,6 +97,8 @@ class PaymentControllerTest {
                 .currency(CurrencyCode.RUB)
                 .legalEntityInn("1234567890")
                 .legalEntityName("OOO Roga")
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         PaymentTransferResponse response = PaymentTransferResponse.builder()
@@ -128,6 +132,8 @@ class PaymentControllerTest {
                 .currency(CurrencyCode.RUB)
                 .legalEntityInn("1234567890")
                 .legalEntityName("OOO")
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         doThrow(new CashbackServiceException("Cashback service call failed", new RuntimeException("down")))

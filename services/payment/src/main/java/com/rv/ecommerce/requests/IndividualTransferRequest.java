@@ -1,6 +1,7 @@
 package com.rv.ecommerce.requests;
 
 import com.rv.ecommerce.entities.PaymentTransfer.CurrencyCode;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -13,6 +14,8 @@ public record IndividualTransferRequest(
         @NotBlank String fromAccountNumber,
         @NotBlank String toAccountNumber,
         @NotNull @Positive BigDecimal amount,
-        @NotNull CurrencyCode currency
+        @NotNull CurrencyCode currency,
+        @Email String senderEmail,
+        @Email String recipientEmail
 ) {
 }

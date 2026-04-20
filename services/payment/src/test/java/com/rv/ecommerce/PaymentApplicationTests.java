@@ -1,5 +1,6 @@
 package com.rv.ecommerce;
 
+import com.rv.ecommerce.notification.PaymentNotificationPublisher;
 import com.rv.ecommerce.outbox.CashbackOutboxPublisher;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,6 +13,9 @@ class PaymentApplicationTests {
 
     @MockitoBean
     private CashbackOutboxPublisher cashbackOutboxPublisher;
+
+    @MockitoBean
+    private PaymentNotificationPublisher paymentNotificationPublisher;
 
     @Test
     void contextLoads() {

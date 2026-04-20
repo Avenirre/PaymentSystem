@@ -11,6 +11,7 @@ import com.rv.ecommerce.entities.PaymentTransfer.PaymentStatus;
 import com.rv.ecommerce.entities.PaymentTransfer.TransferType;
 import com.rv.ecommerce.exceptions.AccountOperationException;
 import com.rv.ecommerce.mappers.PaymentMapper;
+import com.rv.ecommerce.notification.PaymentNotificationPublisher;
 import com.rv.ecommerce.repositories.CashbackOutboxRepository;
 import com.rv.ecommerce.repositories.PaymentTransferRepository;
 import com.rv.ecommerce.requests.IndividualTransferRequest;
@@ -55,6 +56,9 @@ class PaymentServiceTest {
     @Mock
     private AccountClient accountClient;
 
+    @Mock
+    private PaymentNotificationPublisher paymentNotificationPublisher;
+
     @InjectMocks
     private PaymentService paymentService;
 
@@ -75,6 +79,8 @@ class PaymentServiceTest {
                 .toAccountNumber("to1")
                 .amount(new BigDecimal("100.50"))
                 .currency(CurrencyCode.RUB)
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         PaymentTransferResponse response = PaymentTransferResponse.builder()
@@ -109,6 +115,7 @@ class PaymentServiceTest {
                         && o.getTopic().equals("ind-topic")));
         verify(paymentTransferRepository, times(2)).save(any(PaymentTransfer.class));
         verify(accountClient, never()).compensateTransfer(any());
+        verify(paymentNotificationPublisher).publishPaymentCompleted(any(PaymentTransfer.class), eq(request));
     }
 
     @Test
@@ -118,6 +125,8 @@ class PaymentServiceTest {
                 .toAccountNumber("to1")
                 .amount(new BigDecimal("10.00"))
                 .currency(CurrencyCode.RUB)
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         doThrow(new AccountOperationException(409, "conflict"))
@@ -128,6 +137,8 @@ class PaymentServiceTest {
 
         verify(paymentTransferRepository, never()).save(any());
         verify(accountClient, never()).compensateTransfer(any());
+        verify(paymentNotificationPublisher, never()).publishPaymentCompleted(
+                any(PaymentTransfer.class), any(IndividualTransferRequest.class));
     }
 
     @Test
@@ -137,6 +148,8 @@ class PaymentServiceTest {
                 .toAccountNumber("to1")
                 .amount(new BigDecimal("10.00"))
                 .currency(CurrencyCode.RUB)
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         when(paymentTransferRepository.save(any(PaymentTransfer.class)))
@@ -146,6 +159,8 @@ class PaymentServiceTest {
                 .isInstanceOf(IllegalStateException.class);
 
         verify(accountClient).compensateTransfer(any(UUID.class));
+        verify(paymentNotificationPublisher, never()).publishPaymentCompleted(
+                any(PaymentTransfer.class), any(IndividualTransferRequest.class));
     }
 
     @Test
@@ -155,6 +170,8 @@ class PaymentServiceTest {
                 .toAccountNumber("to1")
                 .amount(new BigDecimal("50.00"))
                 .currency(CurrencyCode.EUR)
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         when(paymentTransferRepository.save(any(PaymentTransfer.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -174,6 +191,8 @@ class PaymentServiceTest {
         );
         verify(accountClient).compensateTransfer(transferIdCaptor.getValue());
         verify(paymentTransferRepository, times(1)).save(any(PaymentTransfer.class));
+        verify(paymentNotificationPublisher, never()).publishPaymentCompleted(
+                any(PaymentTransfer.class), any(IndividualTransferRequest.class));
     }
 
     @Test
@@ -186,6 +205,8 @@ class PaymentServiceTest {
                 .toAccountNumber("b")
                 .amount(BigDecimal.TEN)
                 .currency(CurrencyCode.RUB)
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         PaymentTransferResponse response = PaymentTransferResponse.builder()
@@ -206,6 +227,7 @@ class PaymentServiceTest {
         assertThat(paymentService.transferToIndividual(request)).isEqualTo(response);
         verify(cashbackOutboxRepository, never()).save(any());
         verify(accountClient, never()).compensateTransfer(any());
+        verify(paymentNotificationPublisher).publishPaymentCompleted(any(PaymentTransfer.class), eq(request));
     }
 
     @Test
@@ -219,6 +241,8 @@ class PaymentServiceTest {
                 .currency(CurrencyCode.RUB)
                 .legalEntityInn("1234567890")
                 .legalEntityName("OOO Test")
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         PaymentTransferResponse response = PaymentTransferResponse.builder()
@@ -243,6 +267,7 @@ class PaymentServiceTest {
                         && o.getTopic().equals("le-topic")));
         verify(paymentTransferRepository, times(2)).save(any(PaymentTransfer.class));
         verify(accountClient, never()).compensateTransfer(any());
+        verify(paymentNotificationPublisher).publishPaymentCompleted(any(PaymentTransfer.class), eq(request));
     }
 
     @Test
@@ -254,6 +279,8 @@ class PaymentServiceTest {
                 .currency(CurrencyCode.EUR)
                 .legalEntityInn("0987654321")
                 .legalEntityName("OOO Fail")
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         when(paymentTransferRepository.save(any(PaymentTransfer.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -273,6 +300,8 @@ class PaymentServiceTest {
         );
         verify(accountClient).compensateTransfer(transferIdCaptor.getValue());
         verify(paymentTransferRepository, times(1)).save(any(PaymentTransfer.class));
+        verify(paymentNotificationPublisher, never()).publishPaymentCompleted(
+                any(PaymentTransfer.class), any(LegalEntityTransferRequest.class));
     }
 
     @Test
@@ -287,6 +316,8 @@ class PaymentServiceTest {
                 .currency(CurrencyCode.RUB)
                 .legalEntityInn("1111111111")
                 .legalEntityName("OOO X")
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         PaymentTransferResponse response = PaymentTransferResponse.builder()
@@ -307,6 +338,7 @@ class PaymentServiceTest {
         assertThat(paymentService.transferToLegalEntity(request)).isEqualTo(response);
         verify(cashbackOutboxRepository, never()).save(any());
         verify(accountClient, never()).compensateTransfer(any());
+        verify(paymentNotificationPublisher).publishPaymentCompleted(any(PaymentTransfer.class), eq(request));
     }
 
     @Test
@@ -318,6 +350,8 @@ class PaymentServiceTest {
                 .currency(CurrencyCode.RUB)
                 .legalEntityInn("1111111111")
                 .legalEntityName("OOO X")
+                .senderEmail(null)
+                .recipientEmail(null)
                 .build();
 
         when(paymentTransferRepository.save(any(PaymentTransfer.class)))
@@ -327,5 +361,7 @@ class PaymentServiceTest {
                 .isInstanceOf(IllegalStateException.class);
 
         verify(accountClient).compensateTransfer(any(UUID.class));
+        verify(paymentNotificationPublisher, never()).publishPaymentCompleted(
+                any(PaymentTransfer.class), any(LegalEntityTransferRequest.class));
     }
 }
