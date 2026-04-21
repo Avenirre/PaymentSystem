@@ -1,0 +1,4 @@
+databaseChangeLog:
+  - include:
+      file: v1/001-notification-templates.yaml
+      relativeToChangelogFile: true
