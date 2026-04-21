@@ -1,0 +1,90 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-notification-templates
+      author: notification
+      changes:
+        - createTable:
+            tableName: notification_templates
+            columns:
+              - column:
+                  name: template_key
+                  type: varchar(64)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: subject_template
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: body_template
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: active
+                  type: boolean
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+        - insert:
+            tableName: notification_templates
+            columns:
+              - column:
+                  name: template_key
+                  value: ACCOUNT_CREATED
+              - column:
+                  name: subject_template
+                  value: "Счёт {{accountNumber}} открыт"
+              - column:
+                  name: body_template
+                  value: "Здравствуйте.\n\nВаш счёт {{accountNumber}} в валюте {{currency}} (владелец {{ownerId}}) создан.\nДля уведомлений: {{ownerEmail}}.\n"
+              - column:
+                  name: active
+                  valueBoolean: true
+        - insert:
+            tableName: notification_templates
+            columns:
+              - column:
+                  name: template_key
+                  value: PAYMENT_OUTGOING
+              - column:
+                  name: subject_template
+                  value: "Исходящий перевод {{amount}} {{currency}}"
+              - column:
+                  name: body_template
+                  value: "Вы отправили {{amount}} {{currency}} со счёта {{fromAccountNumber}} на {{toAccountNumber}}.\nНомер операции: {{transferId}}.\nКомментарий отправителя: {{senderNote}}.\n"
+              - column:
+                  name: active
+                  valueBoolean: true
+        - insert:
+            tableName: notification_templates
+            columns:
+              - column:
+                  name: template_key
+                  value: PAYMENT_INCOMING
+              - column:
+                  name: subject_template
+                  value: "Входящий перевод {{amount}} {{currency}}"
+              - column:
+                  name: body_template
+                  value: "На ваш счёт {{toAccountNumber}} поступило {{amount}} {{currency}}.\nОтправитель: {{fromAccountNumber}}.\nID: {{transferId}}.\nПримечание получателя: {{recipientNote}}.\n"
+              - column:
+                  name: active
+                  valueBoolean: true
+        - insert:
+            tableName: notification_templates
+            columns:
+              - column:
+                  name: template_key
+                  value: CASHBACK_MONTHLY_PAYOUT
+              - column:
+                  name: subject_template
+                  value: "Кэшбек за {{yearMonth}}"
+              - column:
+                  name: body_template
+                  value: "На счёт {{beneficiaryAccountNumber}} начислен кэшбек {{amount}} {{currency}} за период {{yearMonth}}.\nИдентификатор выплаты: {{payoutReference}}.\n"
+              - column:
+                  name: active
+                  valueBoolean: true
