@@ -18,8 +18,7 @@ spring:
       group-id: ${NOTIFICATION_KAFKA_GROUP:notification-service}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      properties:
-        spring.json.trusted.packages: com.rv.notification.events
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
   mail:
     host: ${SPRING_MAIL_HOST:localhost}
     port: ${SPRING_MAIL_PORT:1025}
