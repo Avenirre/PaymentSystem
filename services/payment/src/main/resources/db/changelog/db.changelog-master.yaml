@@ -2,3 +2,6 @@ databaseChangeLog:
   - include:
       file: v1/001-cashback-outbox.yaml
       relativeToChangelogFile: true
+  - include:
+      file: v1/002-notification-outbox.yaml
+      relativeToChangelogFile: true

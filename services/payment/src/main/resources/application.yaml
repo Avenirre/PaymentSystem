@@ -43,6 +43,9 @@ account:
 
 notification:
   kafka-topic: ${NOTIFICATION_KAFKA_TOPIC:business.notification.events}
+  outbox:
+    publish-interval-ms: ${NOTIFICATION_OUTBOX_PUBLISH_INTERVAL_MS:500}
+    batch-size: ${NOTIFICATION_OUTBOX_BATCH_SIZE:50}
 
 cashback:
   enabled: ${CASHBACK_ENABLED:true}

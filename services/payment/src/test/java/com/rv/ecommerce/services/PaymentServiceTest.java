@@ -11,7 +11,7 @@ import com.rv.ecommerce.entities.PaymentTransfer.PaymentStatus;
 import com.rv.ecommerce.entities.PaymentTransfer.TransferType;
 import com.rv.ecommerce.exceptions.AccountOperationException;
 import com.rv.ecommerce.mappers.PaymentMapper;
-import com.rv.ecommerce.notification.PaymentNotificationPublisher;
+import com.rv.ecommerce.notification.NotificationOutboxWriter;
 import com.rv.ecommerce.repositories.CashbackOutboxRepository;
 import com.rv.ecommerce.repositories.PaymentTransferRepository;
 import com.rv.ecommerce.requests.IndividualTransferRequest;
@@ -57,7 +57,7 @@ class PaymentServiceTest {
     private AccountClient accountClient;
 
     @Mock
-    private PaymentNotificationPublisher paymentNotificationPublisher;
+    private NotificationOutboxWriter notificationOutboxWriter;
 
     @InjectMocks
     private PaymentService paymentService;
@@ -115,7 +115,7 @@ class PaymentServiceTest {
                         && o.getTopic().equals("ind-topic")));
         verify(paymentTransferRepository, times(2)).save(any(PaymentTransfer.class));
         verify(accountClient, never()).compensateTransfer(any());
-        verify(paymentNotificationPublisher).publishPaymentCompleted(any(PaymentTransfer.class), eq(request));
+        verify(notificationOutboxWriter).enqueuePaymentCompleted(any(PaymentTransfer.class), eq(request));
     }
 
     @Test
@@ -137,7 +137,7 @@ class PaymentServiceTest {
 
         verify(paymentTransferRepository, never()).save(any());
         verify(accountClient, never()).compensateTransfer(any());
-        verify(paymentNotificationPublisher, never()).publishPaymentCompleted(
+        verify(notificationOutboxWriter, never()).enqueuePaymentCompleted(
                 any(PaymentTransfer.class), any(IndividualTransferRequest.class));
     }
 
@@ -159,7 +159,7 @@ class PaymentServiceTest {
                 .isInstanceOf(IllegalStateException.class);
 
         verify(accountClient).compensateTransfer(any(UUID.class));
-        verify(paymentNotificationPublisher, never()).publishPaymentCompleted(
+        verify(notificationOutboxWriter, never()).enqueuePaymentCompleted(
                 any(PaymentTransfer.class), any(IndividualTransferRequest.class));
     }
 
@@ -191,7 +191,7 @@ class PaymentServiceTest {
         );
         verify(accountClient).compensateTransfer(transferIdCaptor.getValue());
         verify(paymentTransferRepository, times(1)).save(any(PaymentTransfer.class));
-        verify(paymentNotificationPublisher, never()).publishPaymentCompleted(
+        verify(notificationOutboxWriter, never()).enqueuePaymentCompleted(
                 any(PaymentTransfer.class), any(IndividualTransferRequest.class));
     }
 
@@ -227,7 +227,38 @@ class PaymentServiceTest {
         assertThat(paymentService.transferToIndividual(request)).isEqualTo(response);
         verify(cashbackOutboxRepository, never()).save(any());
         verify(accountClient, never()).compensateTransfer(any());
-        verify(paymentNotificationPublisher).publishPaymentCompleted(any(PaymentTransfer.class), eq(request));
+        verify(notificationOutboxWriter).enqueuePaymentCompleted(any(PaymentTransfer.class), eq(request));
+    }
+
+    @Test
+    void transferToIndividual_whenNotificationOutboxEnqueueFails_compensatesAccount() {
+        ReflectionTestUtils.setField(paymentService, "cashbackEnabled", false);
+        IndividualTransferRequest request = IndividualTransferRequest.builder()
+                .fromAccountNumber("from1")
+                .toAccountNumber("to1")
+                .amount(new BigDecimal("25.00"))
+                .currency(CurrencyCode.RUB)
+                .senderEmail(null)
+                .recipientEmail(null)
+                .build();
+
+        when(paymentTransferRepository.save(any(PaymentTransfer.class))).thenAnswer(inv -> inv.getArgument(0));
+        doThrow(new IllegalStateException("notification outbox"))
+                .when(notificationOutboxWriter).enqueuePaymentCompleted(any(PaymentTransfer.class), any(IndividualTransferRequest.class));
+
+        assertThatThrownBy(() -> paymentService.transferToIndividual(request))
+                .isInstanceOf(IllegalStateException.class);
+
+        ArgumentCaptor<UUID> transferIdCaptor = ArgumentCaptor.forClass(UUID.class);
+        verify(accountClient).applyTransfer(
+                transferIdCaptor.capture(),
+                eq("from1"),
+                eq("to1"),
+                eq(new BigDecimal("25.00")),
+                eq(CurrencyCode.RUB)
+        );
+        verify(accountClient).compensateTransfer(transferIdCaptor.getValue());
+        verify(paymentTransferRepository, times(2)).save(any(PaymentTransfer.class));
     }
 
     @Test
@@ -267,7 +298,7 @@ class PaymentServiceTest {
                         && o.getTopic().equals("le-topic")));
         verify(paymentTransferRepository, times(2)).save(any(PaymentTransfer.class));
         verify(accountClient, never()).compensateTransfer(any());
-        verify(paymentNotificationPublisher).publishPaymentCompleted(any(PaymentTransfer.class), eq(request));
+        verify(notificationOutboxWriter).enqueuePaymentCompleted(any(PaymentTransfer.class), eq(request));
     }
 
     @Test
@@ -300,7 +331,7 @@ class PaymentServiceTest {
         );
         verify(accountClient).compensateTransfer(transferIdCaptor.getValue());
         verify(paymentTransferRepository, times(1)).save(any(PaymentTransfer.class));
-        verify(paymentNotificationPublisher, never()).publishPaymentCompleted(
+        verify(notificationOutboxWriter, never()).enqueuePaymentCompleted(
                 any(PaymentTransfer.class), any(LegalEntityTransferRequest.class));
     }
 
@@ -338,7 +369,7 @@ class PaymentServiceTest {
         assertThat(paymentService.transferToLegalEntity(request)).isEqualTo(response);
         verify(cashbackOutboxRepository, never()).save(any());
         verify(accountClient, never()).compensateTransfer(any());
-        verify(paymentNotificationPublisher).publishPaymentCompleted(any(PaymentTransfer.class), eq(request));
+        verify(notificationOutboxWriter).enqueuePaymentCompleted(any(PaymentTransfer.class), eq(request));
     }
 
     @Test
@@ -361,7 +392,7 @@ class PaymentServiceTest {
                 .isInstanceOf(IllegalStateException.class);
 
         verify(accountClient).compensateTransfer(any(UUID.class));
-        verify(paymentNotificationPublisher, never()).publishPaymentCompleted(
+        verify(notificationOutboxWriter, never()).enqueuePaymentCompleted(
                 any(PaymentTransfer.class), any(LegalEntityTransferRequest.class));
     }
 }

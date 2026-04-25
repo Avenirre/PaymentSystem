@@ -40,3 +40,9 @@ cashback:
 
 account:
   base-url: http://localhost:8090
+
+notification:
+  kafka-topic: business.notification.events.test
+  outbox:
+    publish-interval-ms: 60000
+    batch-size: 10
