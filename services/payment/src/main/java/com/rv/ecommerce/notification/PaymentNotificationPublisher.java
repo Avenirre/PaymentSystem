@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class PaymentNotificationPublisher {
@@ -28,19 +29,19 @@ public class PaymentNotificationPublisher {
         this.topic = topic;
     }
 
-    public void publishPaymentCompleted(PaymentTransfer saved, IndividualTransferRequest request) {
-        publishPaymentCompleted(saved,
-                request.senderEmail(),
-                request.recipientEmail());
+    public BusinessNotificationEvent buildPaymentCompletedEvent(PaymentTransfer saved, IndividualTransferRequest request) {
+        return buildPaymentCompletedEvent(saved, request.senderEmail(), request.recipientEmail());
     }
 
-    public void publishPaymentCompleted(PaymentTransfer saved, LegalEntityTransferRequest request) {
-        publishPaymentCompleted(saved,
-                request.senderEmail(),
-                request.recipientEmail());
+    public BusinessNotificationEvent buildPaymentCompletedEvent(PaymentTransfer saved, LegalEntityTransferRequest request) {
+        return buildPaymentCompletedEvent(saved, request.senderEmail(), request.recipientEmail());
     }
 
-    private void publishPaymentCompleted(PaymentTransfer saved, String senderEmail, String recipientEmail) {
+    private static BusinessNotificationEvent buildPaymentCompletedEvent(
+            PaymentTransfer saved,
+            String senderEmail,
+            String recipientEmail
+    ) {
         Map<String, String> payload = Map.ofEntries(
                 Map.entry("transferId", saved.getId().toString()),
                 Map.entry("fromAccountNumber", saved.getFromAccountNumber()),
@@ -52,12 +53,22 @@ public class PaymentNotificationPublisher {
                 Map.entry("senderNote", ""),
                 Map.entry("recipientNote", "")
         );
-        BusinessNotificationEvent event = new BusinessNotificationEvent(
+        return new BusinessNotificationEvent(
                 UUID.randomUUID(),
                 NotificationEventType.PAYMENT_COMPLETED,
                 Instant.now(),
                 payload
         );
-        kafkaTemplate.send(topic, event.eventId().toString(), event);
+    }
+
+    /**
+     * Used by {@link com.rv.ecommerce.outbox.NotificationOutboxPublisher} after reading persisted outbox rows.
+     */
+    public void publish(BusinessNotificationEvent event) {
+        try {
+            kafkaTemplate.send(topic, event.eventId().toString(), event).get(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new IllegalStateException("Kafka send failed for notification event " + event.eventId(), e);
+        }
     }
 }

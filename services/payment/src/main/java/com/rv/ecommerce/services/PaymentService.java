@@ -11,7 +11,7 @@ import com.rv.ecommerce.entities.PaymentTransfer.TransferType;
 import com.rv.ecommerce.kafka.CashbackTransferPayload;
 import com.rv.ecommerce.kafka.IndividualCashbackPayload;
 import com.rv.ecommerce.mappers.PaymentMapper;
-import com.rv.ecommerce.notification.PaymentNotificationPublisher;
+import com.rv.ecommerce.notification.NotificationOutboxWriter;
 import com.rv.ecommerce.repositories.CashbackOutboxRepository;
 import com.rv.ecommerce.repositories.PaymentTransferRepository;
 import com.rv.ecommerce.requests.IndividualTransferRequest;
@@ -37,7 +37,7 @@ public class PaymentService {
     private final CashbackOutboxRepository cashbackOutboxRepository;
     private final JsonMapper jsonMapper;
     private final AccountClient accountClient;
-    private final PaymentNotificationPublisher paymentNotificationPublisher;
+    private final NotificationOutboxWriter notificationOutboxWriter;
 
     @Value("${cashback.enabled:true}")
     private boolean cashbackEnabled;
@@ -86,7 +86,7 @@ public class PaymentService {
                 log.info("Individual transfer completed without cashback (disabled) transferId={}", saved.getId());
             }
 
-            paymentNotificationPublisher.publishPaymentCompleted(saved, request);
+            notificationOutboxWriter.enqueuePaymentCompleted(saved, request);
             return paymentMapper.toResponse(saved);
         } catch (RuntimeException e) {
             if (accountApplied) {
@@ -136,7 +136,7 @@ public class PaymentService {
                 log.info("Legal-entity transfer completed without cashback (disabled) transferId={}", saved.getId());
             }
 
-            paymentNotificationPublisher.publishPaymentCompleted(saved, request);
+            notificationOutboxWriter.enqueuePaymentCompleted(saved, request);
             return paymentMapper.toResponse(saved);
         } catch (RuntimeException e) {
             if (accountApplied) {
