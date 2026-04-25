@@ -1,5 +1,6 @@
-# Запуск Postgres + Mongo + Kafka + MailHog + account + payment + cashback + notification из корня репозитория:
-#   docker compose up --build -d
+# Full stack: Postgres, Mongo, Kafka, MailHog, account, payment, cashback, notification, Prometheus, Grafana.
+# Start from repo root: docker compose up --build -d
+# Metrics UI: Prometheus http://localhost:${PROMETHEUS_PORT:-9090}  Grafana http://localhost:${GRAFANA_PORT:-3000} (admin / ${GRAFANA_ADMIN_PASSWORD:-admin})
 
 services:
   zookeeper:
@@ -180,6 +181,45 @@ services:
     ports:
       - "${NOTIFICATION_PORT:-8093}:8093"
 
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    container_name: paymentsystem-prometheus
+    depends_on:
+      account:
+        condition: service_started
+      payment:
+        condition: service_started
+      cashback:
+        condition: service_started
+      notification:
+        condition: service_started
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: paymentsystem-grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000}
+    volumes:
+      - paymentsystem-grafana-data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+
 volumes:
   paymentsystem-postgres-data:
   paymentsystem-mongo-data:
+  paymentsystem-grafana-data:
